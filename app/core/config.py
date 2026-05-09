@@ -1,0 +1,72 @@
+from functools import lru_cache
+from typing import Literal
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    # 서버
+    app_name: str = "navercloud-ai-interview"
+    app_env: Literal["local", "dev", "prod"] = "local"
+    log_level: str = "INFO"
+
+    # DB
+    database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/interview"
+
+    # Ncloud 공통
+    ncloud_access_key: str = ""
+    ncloud_secret_key: str = ""
+
+    # Clova X (LLM)
+    clova_x_api_url: str = "https://clovastudio.stream.ntruss.com"
+    clova_x_api_key: str = ""
+    clova_x_model: str = "HCX-005"
+
+    # Clova Voice (TTS)
+    clova_voice_api_url: str = "https://naveropenapi.apigw.ntruss.com/tts-premium/v1/tts"
+    clova_voice_client_id: str = ""
+    clova_voice_client_secret: str = ""
+    clova_voice_speaker: str = "nara"
+
+    # Clova Speech (STT)
+    clova_speech_api_url: str = ""
+    clova_speech_secret: str = ""
+    clova_speech_language: str = "ko-KR"
+
+    # Embedding
+    ncloud_embedding_api_url: str = ""
+    ncloud_embedding_api_key: str = ""
+    ncloud_embedding_model: str = "bge-m3"
+    embedding_dimension: int = 1024
+
+    # Object Storage
+    object_storage_endpoint: str = ""
+    object_storage_region: str = "kr-standard"
+    object_storage_bucket: str = ""
+    object_storage_access_key: str = ""
+    object_storage_secret_key: str = ""
+    local_storage_dir: str = "./_storage"
+
+    # RAG
+    chunk_size: int = 800
+    chunk_overlap: int = 120
+    retrieval_top_k: int = 8
+    rerank_top_k: int = 4
+    question_count: int = 5
+    recording_seconds: int = 30
+
+    @property
+    def use_object_storage(self) -> bool:
+        return bool(self.object_storage_endpoint and self.object_storage_bucket)
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    return Settings()
