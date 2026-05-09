@@ -37,43 +37,68 @@ app/
 
 ---
 
-## 빠른 시작 (로컬)
+## 빠른 시작
 
-### 1) PostgreSQL + pgvector
+> 사전 조건: **Python 3.10 ~ 3.12** 설치 (`.python-version` 참고). PostgreSQL + pgvector 는 Ncloud 에 구축되어 있다고 가정.
+
+### Windows (PowerShell)
+
+```powershell
+git clone <repo>
+cd navercloud-ai
+powershell -ExecutionPolicy Bypass -File scripts\dev.ps1
+```
+
+### Mac / Linux / WSL
 
 ```bash
-docker run -d --name pg-interview \
-  -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=interview \
-  -p 5432:5432 ankane/pgvector
+git clone <repo>
+cd navercloud-ai
+bash scripts/dev.sh
 ```
 
-### 2) 가상환경 + 의존성
+스크립트가 자동으로 처리하는 것:
+
+1. Python 3.10~3.12 탐지
+2. `.venv/` 생성 (없을 때만)
+3. `requirements.txt` 동기화 (해시 변경 시에만 재설치)
+4. `.env` 가 없으면 `.env.example` 복사 후 종료 → 키 채우고 다시 실행
+5. `uvicorn app.main:app --reload --port 8000` 실행
+
+### 옵션
+
+| 옵션 | Windows | Unix |
+| --- | --- | --- |
+| 세팅만, 실행 X | `scripts\dev.ps1 -SkipRun` | `bash scripts/dev.sh --skip-run` |
+| venv 재생성 | `scripts\dev.ps1 -Reinstall` | `bash scripts/dev.sh --reinstall` |
+| 포트 변경 | `scripts\dev.ps1 -Port 8001` | `PORT=8001 bash scripts/dev.sh` |
+
+### 수동 실행 (스크립트 없이)
 
 ```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
-
-### 3) 환경변수
-
-```powershell
-Copy-Item .env.example .env
-# .env에 NCLOUD/CLOVA 자격증명 채우기
-```
-
-### 4) 실행
-
-```powershell
+.\.venv\Scripts\Activate.ps1
 uvicorn app.main:app --reload --port 8000
 ```
 
-- 로컬 환경(`APP_ENV=local`)에서는 부팅 시 `CREATE EXTENSION vector` 와 테이블 자동 생성.
-- 운영 환경에서는 alembic 등 별도 마이그레이션을 권장.
-
-### 5) Swagger
+### Swagger
 
 http://localhost:8000/docs
+
+### .env 필수 항목
+
+`.env.example` 의 모든 항목 중 다음만 채우면 동작:
+
+- `DATABASE_URL` — Ncloud Postgres + pgvector 접속 URL (`postgresql+psycopg://...`)
+- `CLOVA_X_API_KEY`
+- `CLOVA_VOICE_CLIENT_ID` / `CLOVA_VOICE_CLIENT_SECRET`
+- `CLOVA_SPEECH_API_URL` / `CLOVA_SPEECH_SECRET`
+- `NCLOUD_EMBEDDING_API_URL` / `NCLOUD_EMBEDDING_API_KEY`
+
+`OBJECT_STORAGE_*` 는 비워두면 로컬 디스크(`_storage/`)에 저장 — 개발 시 편리.
+
+### 마이그레이션
+
+`APP_ENV=local` 일 때 부팅 시 `CREATE EXTENSION vector` 와 테이블이 자동 생성됩니다. 운영 배포 시에는 alembic 등 별도 마이그레이션을 권장.
 
 ---
 

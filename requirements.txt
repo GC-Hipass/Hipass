@@ -22,7 +22,7 @@ numpy==1.26.4
 
 # HTTP
 httpx==0.27.2
-tenacity==9.0.0
+tenacity>=8.2,<9.0
 
 # 오디오 길이 계산
 mutagen==1.47.0
