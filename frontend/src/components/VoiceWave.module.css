@@ -1,0 +1,41 @@
+.wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 80px;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--sp-3);
+  background: var(--surface-soft);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
+.bar {
+  width: 4px;
+  background: var(--border-strong);
+  border-radius: 2px;
+  transition: height 0.08s ease, background 0.2s;
+}
+
+.wrapActive {
+  background: var(--brand-50);
+  border-color: var(--brand-200);
+}
+
+.wrapActive .bar {
+  background: linear-gradient(180deg, var(--brand-300), var(--brand-500));
+  animation: idleWave 1.6s ease-in-out infinite;
+}
+
+@keyframes idleWave {
+  0%,
+  100% {
+    transform: scaleY(0.7);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}

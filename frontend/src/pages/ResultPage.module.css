@@ -1,0 +1,214 @@
+.page {
+  min-height: 100vh;
+  background: var(--surface-alt);
+  display: flex;
+  flex-direction: column;
+}
+
+.loading {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: var(--sp-4);
+  color: var(--text-muted);
+}
+
+.retryBtn {
+  background: var(--brand-500);
+  color: var(--text-inverse);
+  border: none;
+  padding: 10px var(--sp-6);
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+}
+
+/* ----------- Hero (dark gradient) ----------- */
+.hero {
+  position: relative;
+  background: linear-gradient(135deg, var(--result-bg-from) 0%, var(--result-bg-to) 100%);
+  color: var(--text-inverse);
+  padding: var(--sp-12) var(--sp-6) var(--sp-16);
+  overflow: hidden;
+}
+
+.heroBg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(60% 60% at 80% 20%, rgba(168, 187, 255, 0.18), transparent 70%),
+    radial-gradient(50% 50% at 10% 80%, rgba(116, 143, 255, 0.18), transparent 70%);
+  pointer-events: none;
+}
+
+.heroContent {
+  position: relative;
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-5);
+}
+
+.heroLabel {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  opacity: 0.8;
+}
+
+.heroTitle {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.5;
+  text-align: center;
+  max-width: 540px;
+}
+
+/* ----------- Main ----------- */
+.main {
+  flex: 1;
+  max-width: 720px;
+  width: 100%;
+  margin: -32px auto 0;
+  padding: 0 var(--sp-6) var(--sp-12);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-3);
+}
+
+@media (max-width: 600px) {
+  .cardGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  padding: var(--sp-5);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.cardGood {
+  border-top: 3px solid var(--brand-500);
+}
+
+.cardBad {
+  border-top: 3px solid var(--warning);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.cardIcon {
+  font-size: 16px;
+  color: var(--brand-500);
+}
+
+.cardBad .cardIcon {
+  color: var(--warning);
+}
+
+.cardTitle {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.cardList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.cardList li {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.55;
+  padding-left: var(--sp-4);
+  position: relative;
+}
+
+.cardList li::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: var(--brand-300);
+}
+
+.cardEmpty {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+/* ----------- Tip ----------- */
+.tipBox {
+  background: var(--brand-500);
+  color: var(--text-inverse);
+  border-radius: var(--radius-md);
+  padding: var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.tipBadge {
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 3px var(--sp-3);
+  border-radius: var(--radius-pill);
+}
+
+.tipText {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ----------- QA box ----------- */
+.qaBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.qaTitle {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.footerActions {
+  margin-top: var(--sp-6);
+  display: flex;
+  justify-content: center;
+}
+
+.primaryLink {
+  background: var(--text);
+  color: var(--text-inverse);
+  padding: 14px var(--sp-10);
+  border-radius: var(--radius-pill);
+  font-weight: 700;
+  font-size: 14px;
+}
