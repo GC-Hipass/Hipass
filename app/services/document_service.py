@@ -33,7 +33,7 @@ def store_and_index(
     file_type = _file_type_from_name(filename)
     file_hash = hashlib.sha256(raw_bytes).hexdigest()
 
-    storage = storage_service.get_storage()
+    storage = storage_service.get_document_store()
     key = storage_service.upload_document_key(session_id, filename)
     storage_path = storage.put(key, raw_bytes)
 

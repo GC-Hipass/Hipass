@@ -9,10 +9,27 @@ logger = logging.getLogger(__name__)
 
 
 def _extract_pdf(data: bytes) -> str:
+    # pymupdf: 한국어 CMap(/KSCms-UHC-H 등) 완전 지원
+    try:
+        import fitz  # pymupdf
+
+        doc = fitz.open(stream=data, filetype="pdf")
+        parts = [page.get_text() for page in doc]
+        doc.close()
+        text = "\n".join(p.strip() for p in parts if p and p.strip())
+        if text:
+            return text
+        logger.warning("pymupdf 텍스트 추출 결과가 비어있음, pypdf로 폴백")
+    except ImportError:
+        logger.warning("pymupdf 미설치, pypdf로 폴백 (한국어 PDF 인코딩 오류 발생 가능)")
+    except Exception as e:  # noqa: BLE001
+        logger.warning("pymupdf 실패: %s, pypdf로 폴백", e)
+
+    # pypdf 폴백
     from pypdf import PdfReader
 
     reader = PdfReader(io.BytesIO(data))
-    parts: list[str] = []
+    parts = []
     for page in reader.pages:
         try:
             parts.append(page.extract_text() or "")

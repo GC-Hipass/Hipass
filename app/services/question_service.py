@@ -40,7 +40,7 @@ def generate_questions_and_tts(
     db.flush()  # id 확보
 
     tts = get_tts_provider()
-    storage = storage_service.get_storage()
+    storage = storage_service.get_voice_store()
     for q in questions:
         try:
             result = tts.synthesize(q.question)
@@ -79,6 +79,6 @@ def get_question_audio(db: Session, question_id: int) -> tuple[bytes, str]:
     q = get_question_by_id(db, question_id)
     if not q.tts_audio_path:
         raise QuestionNotFound(f"질문 {question_id}의 TTS가 생성되지 않았습니다.")
-    storage = storage_service.get_storage()
+    storage = storage_service.get_voice_store()
     key = storage_service.question_audio_key(question_id)
     return storage.get(key), "audio/mpeg"

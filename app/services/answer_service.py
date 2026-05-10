@@ -64,7 +64,7 @@ def store_answer(
 
     ext = _validate_audio(audio_filename, content_type)
 
-    storage = storage_service.get_storage()
+    storage = storage_service.get_voice_store()
     key = storage_service.answer_audio_key(session_id, question_id, ext)
     audio_path = storage.put(key, audio_bytes, content_type=content_type or "audio/mpeg")
 

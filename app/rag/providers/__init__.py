@@ -4,7 +4,7 @@
 """
 from app.rag.providers.embedding import EmbeddingProvider, get_embedding_provider
 from app.rag.providers.llm import LLMProvider, get_llm_provider
-from app.rag.providers.object_storage import ObjectStorage, get_object_storage
+from app.rag.providers.object_storage import ObjectStorage, get_document_storage, get_voice_storage
 from app.rag.providers.stt import STTProvider, get_stt_provider
 from app.rag.providers.tts import TTSProvider, TTSResult, get_tts_provider
 
@@ -17,7 +17,8 @@ __all__ = [
     "TTSResult",
     "get_embedding_provider",
     "get_llm_provider",
-    "get_object_storage",
+    "get_voice_storage",
+    "get_document_storage",
     "get_stt_provider",
     "get_tts_provider",
 ]

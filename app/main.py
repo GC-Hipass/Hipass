@@ -8,10 +8,12 @@ from app.core.config import get_settings
 from app.core.error_handlers import register_error_handlers
 from app.core.logging import setup_logging
 
+# uvicorn보다 먼저 로깅 설정 — lifespan에서 호출하면 uvicorn 핸들러가 먼저 등록됨
+setup_logging()
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    setup_logging()
     settings = get_settings()
     if settings.app_env == "local":
         # 로컬 개발 편의: pgvector 확장과 테이블을 자동 생성한다.

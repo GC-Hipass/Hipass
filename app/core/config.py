@@ -48,13 +48,21 @@ class Settings(BaseSettings):
     ncloud_embedding_model: str = "bge-m3"
     embedding_dimension: int = 1024
 
-    # Object Storage
+    # Object Storage — 공통
     object_storage_endpoint: str = ""
     object_storage_region: str = "kr-standard"
-    object_storage_bucket: str = ""
-    object_storage_access_key: str = ""
-    object_storage_secret_key: str = ""
-    local_storage_dir: str = "./_storage"
+
+    # Object Storage — 음성 파일 전용
+    object_storage_bucket_voice: str = ""
+    object_storage_access_key_voice: str = ""
+    object_storage_secret_key_voice: str = ""
+    local_storage_dir_voice: str = "./_storage/audio"
+
+    # Object Storage — 문서 파일 전용
+    object_storage_bucket_document: str = ""
+    object_storage_access_key_document: str = ""
+    object_storage_secret_key_document: str = ""
+    local_storage_dir_document: str = "./_storage/documents"
 
     # RAG
     chunk_size: int = 800
@@ -65,8 +73,12 @@ class Settings(BaseSettings):
     recording_seconds: int = 30
 
     @property
-    def use_object_storage(self) -> bool:
-        return bool(self.object_storage_endpoint and self.object_storage_bucket)
+    def use_voice_storage(self) -> bool:
+        return bool(self.object_storage_endpoint and self.object_storage_bucket_voice)
+
+    @property
+    def use_document_storage(self) -> bool:
+        return bool(self.object_storage_endpoint and self.object_storage_bucket_document)
 
 
 @lru_cache(maxsize=1)
