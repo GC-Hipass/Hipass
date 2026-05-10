@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     clova_speech_language: str = "ko-KR"
 
     # Embedding
+    # ncloud: Ncloud Embedding API 호출. mock: 결정적 의사 임베딩 (오프라인 테스트용).
+    embedding_provider: Literal["ncloud", "mock"] = "ncloud"
     ncloud_embedding_api_url: str = ""
     ncloud_embedding_api_key: str = ""
     ncloud_embedding_model: str = "bge-m3"

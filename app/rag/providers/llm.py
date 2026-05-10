@@ -90,6 +90,52 @@ class ClovaXProvider(LLMProvider):
             raise LLMEvaluationFailed(f"Clova X 응답 형식 오류: {e}") from e
 
 
+class MockLLMProvider(LLMProvider):
+    """로컬 개발용 Mock LLM. Ncloud 자격증명 없이 결정적 응답을 반환한다."""
+
+    def generate(self, prompt: str, *, system: str | None = None, temperature: float = 0.5) -> str:
+        logger.debug("MockLLMProvider.generate (system=%s...)", (system or "")[:30])
+        s = system or ""
+
+        if "배열로만" in s:
+            return json.dumps([
+                {"order": 1, "question_type": "personality",
+                 "question": "팀 프로젝트에서 의견 충돌이 발생했을 때 어떻게 해결하셨나요?"},
+                {"order": 2, "question_type": "technical",
+                 "question": "RESTful API 설계 원칙과 실제 적용 사례를 설명해주세요."},
+                {"order": 3, "question_type": "document",
+                 "question": "제출하신 문서에서 가장 자신 있는 프로젝트의 기술 스택과 역할을 설명해주세요."},
+                {"order": 4, "question_type": "document",
+                 "question": "문서에 기술된 경험 중 가장 어려웠던 기술적 문제와 해결 방법을 설명해주세요."},
+                {"order": 5, "question_type": "company",
+                 "question": "당사에 지원한 이유와 입사 후 이루고 싶은 목표를 말씀해주세요."},
+            ], ensure_ascii=False)
+
+        if "모범답안" in s:
+            return "핵심 개념을 명확히 설명하고, 실제 경험과 연계하여 구체적인 예시를 들며 답변하는 것이 중요합니다."
+
+        if "코칭" in s:
+            return json.dumps({
+                "summary": "전반적으로 기본 개념은 이해하고 있으나 구체적인 경험 연결이 부족합니다.",
+                "strengths": ["핵심 키워드를 적절히 언급함", "논리적 흐름을 유지함"],
+                "weaknesses": ["구체적 수치·사례 부족", "문서 근거 기반 설명 미흡"],
+                "recommendation": "답변 시 정의-이유-예시 구조를 활용하고, 실제 프로젝트 경험을 수치와 함께 제시하세요.",
+            }, ensure_ascii=False)
+
+        # 기본: 답변 평가 형식
+        return json.dumps({
+            "scores": {"semantic": 70, "keyword": 65, "groundedness": 60, "logic": 70, "specificity": 55},
+            "strengths": ["핵심 개념을 언급하였습니다"],
+            "weaknesses": ["구체적인 사례가 부족합니다"],
+            "improvements": ["실무 경험을 연결하여 설명하세요"],
+            "feedback": "기본 개념은 이해하고 있으나 구체성이 부족합니다.",
+        }, ensure_ascii=False)
+
+
 @lru_cache(maxsize=1)
 def get_llm_provider() -> LLMProvider:
-    return ClovaXProvider(get_settings())
+    s = get_settings()
+    if not s.clova_x_api_key:
+        logger.warning("CLOVA_X_API_KEY not set — using MockLLMProvider")
+        return MockLLMProvider()
+    return ClovaXProvider(s)

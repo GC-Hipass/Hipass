@@ -37,8 +37,6 @@ class ClovaSpeechProvider(STTProvider):
         if not s.clova_speech_api_url or not s.clova_speech_secret:
             raise STTFailed("Clova Speech 환경변수가 설정되지 않았습니다.")
 
-        # Clova Speech recognizer/upload 엔드포인트 호출.
-        # 실제 스펙에 맞춰 params/json/headers는 운영 환경에서 보정해야 한다.
         headers = {
             "X-CLOVASPEECH-API-KEY": s.clova_speech_secret,
             "Content-Type": "application/octet-stream",
@@ -62,6 +60,22 @@ class ClovaSpeechProvider(STTProvider):
             raise STTFailed(str(e)) from e
 
 
+class MockSTTProvider(STTProvider):
+    """로컬 개발용 Mock STT. Ncloud 자격증명 없이 고정 문자열을 반환한다."""
+
+    @property
+    def name(self) -> str:
+        return "mock_stt"
+
+    def transcribe(self, audio_bytes: bytes, *, content_type: str) -> str:
+        logger.debug("MockSTTProvider.transcribe called (%d bytes)", len(audio_bytes))
+        return "테스트 답변입니다. 해당 질문에 대해 최선을 다해 답변하겠습니다."
+
+
 @lru_cache(maxsize=1)
 def get_stt_provider() -> STTProvider:
-    return ClovaSpeechProvider(get_settings())
+    s = get_settings()
+    if not s.clova_speech_api_url or not s.clova_speech_secret:
+        logger.warning("Clova Speech credentials not set — using MockSTTProvider")
+        return MockSTTProvider()
+    return ClovaSpeechProvider(s)

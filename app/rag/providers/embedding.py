@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 from abc import ABC, abstractmethod
 from functools import lru_cache
 
 import httpx
+import numpy as np
 
 from app.core.config import Settings, get_settings
 from app.core.exceptions import EmbeddingFailed
@@ -72,6 +74,41 @@ class NcloudEmbeddingProvider(EmbeddingProvider):
         return results
 
 
+class MockEmbeddingProvider(EmbeddingProvider):
+    """결정적 mock 임베딩.
+
+    - 같은 텍스트는 항상 같은 벡터를 반환한다 (해시 기반 시드).
+    - 의미적 유사도는 보장되지 않는다 — 데이터 흐름/저장/검색 코드 경로를 검증하기 위한 용도.
+    """
+
+    def __init__(self, settings: Settings):
+        self._dim = settings.embedding_dimension
+
+    @property
+    def dimension(self) -> int:
+        return self._dim
+
+    def embed(self, text: str) -> list[float]:
+        return self.embed_batch([text])[0]
+
+    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        out: list[list[float]] = []
+        for text in texts:
+            seed_bytes = hashlib.sha256(text.encode("utf-8")).digest()[:8]
+            seed = int.from_bytes(seed_bytes, "little")
+            rng = np.random.default_rng(seed)
+            v = rng.standard_normal(self._dim)
+            norm = np.linalg.norm(v)
+            if norm > 0:
+                v = v / norm
+            out.append(v.astype(float).tolist())
+        return out
+
+
 @lru_cache(maxsize=1)
 def get_embedding_provider() -> EmbeddingProvider:
-    return NcloudEmbeddingProvider(get_settings())
+    settings = get_settings()
+    if settings.embedding_provider == "mock":
+        logger.info("embedding provider: MOCK (deterministic, offline)")
+        return MockEmbeddingProvider(settings)
+    return NcloudEmbeddingProvider(settings)
