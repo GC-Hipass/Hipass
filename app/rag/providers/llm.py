@@ -6,6 +6,7 @@ import re
 from abc import ABC, abstractmethod
 from functools import lru_cache
 from typing import Any
+from uuid import uuid4
 
 import httpx
 
@@ -58,17 +59,21 @@ class ClovaXProvider(LLMProvider):
 
         url = (
             f"{self._settings.clova_x_api_url.rstrip('/')}"
-            f"/testapp/v1/chat-completions/{self._settings.clova_x_model}"
+            f"/v3/chat-completions/{self._settings.clova_x_model}"
         )
         headers = {
             "Authorization": f"Bearer {self._settings.clova_x_api_key}",
+            "X-NCP-CLOVASTUDIO-REQUEST-ID": str(uuid4()),
             "Content-Type": "application/json",
-            "Accept": "application/json",
         }
         messages = []
         if system:
-            messages.append({"role": "system", "content": system})
-        messages.append({"role": "user", "content": prompt})
+            messages.append(
+                {"role": "system", "content": [{"type": "text", "text": system}]}
+            )
+        messages.append(
+            {"role": "user", "content": [{"type": "text", "text": prompt}]}
+        )
 
         body = {
             "messages": messages,
@@ -76,7 +81,8 @@ class ClovaXProvider(LLMProvider):
             "topK": 0,
             "maxTokens": 2048,
             "temperature": temperature,
-            "repeatPenalty": 5.0,
+            "repetitionPenalty": 1.1,
+            "stop": [],
         }
         try:
             resp = self._client.post(url, headers=headers, json=body)

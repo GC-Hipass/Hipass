@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from abc import ABC, abstractmethod
 from functools import lru_cache
@@ -22,7 +23,12 @@ class STTProvider(ABC):
 
 
 class ClovaSpeechProvider(STTProvider):
-    """Ncloud Clova Speech (CSR)."""
+    """Ncloud Clova Speech providers.
+
+    Supports both:
+    - CLOVA Speech local-file recognition (`.../recognizer/upload`)
+    - CLOVA Speech Recognition CSR (`.../stt`)
+    """
 
     def __init__(self, settings: Settings):
         self._settings = settings
@@ -35,33 +41,151 @@ class ClovaSpeechProvider(STTProvider):
     def transcribe(self, audio_bytes: bytes, *, content_type: str) -> str:
         s = self._settings
         if not s.clova_speech_api_url or not s.clova_speech_secret:
-            raise STTFailed("Clova Speech 환경변수가 설정되지 않았습니다.")
+            raise STTFailed("Clova Speech environment variables are not configured.")
 
-        headers = {
-            "X-CLOVASPEECH-API-KEY": s.clova_speech_secret,
-            "Content-Type": "application/octet-stream",
+        url = s.clova_speech_api_url.rstrip("/")
+        if url.endswith("/stt"):
+            return self._transcribe_csr(
+                url,
+                audio_bytes=audio_bytes,
+                language=s.clova_speech_language,
+            )
+        return self._transcribe_upload(
+            url,
+            audio_bytes=audio_bytes,
+            content_type=content_type,
+            language=s.clova_speech_language,
+        )
+
+    def _transcribe_upload(
+        self,
+        url: str,
+        *,
+        audio_bytes: bytes,
+        content_type: str,
+        language: str,
+    ) -> str:
+        headers = {"X-CLOVASPEECH-API-KEY": self._settings.clova_speech_secret}
+        params_payload = {
+            "language": language,
+            "completion": "sync",
+            "callback": "",
+            "fullText": True,
         }
-        params = {"lang": s.clova_speech_language}
         try:
             resp = self._client.post(
-                f"{s.clova_speech_api_url.rstrip('/')}/recognizer/upload",
-                params=params,
+                self._upload_url(url),
+                headers=headers,
+                data={
+                    "params": json.dumps(params_payload, ensure_ascii=False),
+                    "type": "application/json",
+                },
+                files={
+                    "media": (
+                        self._filename_from_content_type(content_type),
+                        audio_bytes,
+                        content_type,
+                    )
+                },
+            )
+            resp.raise_for_status()
+            text = self._extract_text(resp.json())
+            if not text:
+                raise STTFailed("Unexpected empty STT response.")
+            return text
+        except httpx.HTTPError as e:
+            logger.exception("clova speech upload stt failed")
+            raise STTFailed(str(e)) from e
+
+    def _transcribe_csr(
+        self,
+        url: str,
+        *,
+        audio_bytes: bytes,
+        language: str,
+    ) -> str:
+        headers = {
+            "X-CLOVASPEECH-API-KEY": self._settings.clova_speech_secret,
+            "Content-Type": "application/octet-stream",
+        }
+        try:
+            resp = self._client.post(
+                url,
+                params={"lang": self._to_csr_language(language)},
                 headers=headers,
                 content=audio_bytes,
             )
             resp.raise_for_status()
-            data = resp.json()
-            text = data.get("text") or data.get("result", {}).get("text", "")
-            if not isinstance(text, str):
-                raise STTFailed(f"STT 응답 형식 오류: {data}")
-            return text.strip()
+            text = self._extract_text(resp.json())
+            if not text:
+                raise STTFailed("Unexpected empty STT response.")
+            return text
         except httpx.HTTPError as e:
-            logger.exception("clova speech stt failed")
+            logger.exception("clova speech csr failed")
             raise STTFailed(str(e)) from e
+
+    @staticmethod
+    def _upload_url(base_url: str) -> str:
+        if base_url.endswith("/recognizer/upload"):
+            return base_url
+        if base_url.endswith("/recognizer"):
+            return f"{base_url}/upload"
+        return f"{base_url}/recognizer/upload"
+
+    @staticmethod
+    def _filename_from_content_type(content_type: str) -> str:
+        normalized = (content_type or "").split(";")[0].strip().lower()
+        ext_map = {
+            "audio/wav": ".wav",
+            "audio/x-wav": ".wav",
+            "audio/mpeg": ".mp3",
+            "audio/mp3": ".mp3",
+            "audio/mp4": ".mp4",
+            "audio/m4a": ".m4a",
+            "audio/x-m4a": ".m4a",
+            "audio/ogg": ".ogg",
+            "audio/webm": ".webm",
+        }
+        return f"speech{ext_map.get(normalized, '.wav')}"
+
+    @staticmethod
+    def _to_csr_language(language: str) -> str:
+        return {
+            "ko-KR": "Kor",
+            "en-US": "Eng",
+            "ja": "Jpn",
+            "zh-cn": "Chn",
+            "zh-tw": "Chn",
+        }.get(language, "Kor")
+
+    @staticmethod
+    def _extract_text(data: object) -> str:
+        if isinstance(data, dict):
+            text = data.get("text")
+            if isinstance(text, str) and text.strip():
+                return text.strip()
+
+            result = data.get("result")
+            if isinstance(result, dict):
+                result_text = result.get("text")
+                if isinstance(result_text, str) and result_text.strip():
+                    return result_text.strip()
+
+            segments = data.get("segments")
+            if isinstance(segments, list):
+                parts: list[str] = []
+                for item in segments:
+                    if isinstance(item, dict):
+                        segment_text = item.get("text")
+                        if isinstance(segment_text, str) and segment_text.strip():
+                            parts.append(segment_text.strip())
+                if parts:
+                    return " ".join(parts)
+        return ""
 
 
 class MockSTTProvider(STTProvider):
-    """로컬 개발용 Mock STT. Ncloud 자격증명 없이 고정 문자열을 반환한다."""
+    """Local mock STT for development without external credentials."""
 
     @property
     def name(self) -> str:
@@ -76,6 +200,6 @@ class MockSTTProvider(STTProvider):
 def get_stt_provider() -> STTProvider:
     s = get_settings()
     if not s.clova_speech_api_url or not s.clova_speech_secret:
-        logger.warning("Clova Speech credentials not set — using MockSTTProvider")
+        logger.warning("Clova Speech credentials not set -> using MockSTTProvider")
         return MockSTTProvider()
     return ClovaSpeechProvider(s)
