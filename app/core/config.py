@@ -1,3 +1,4 @@
+import json
 from functools import lru_cache
 from typing import Literal
 
@@ -12,15 +13,17 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # 서버
+    # Server
     app_name: str = "navercloud-ai-interview"
     app_env: Literal["local", "dev", "prod"] = "local"
     log_level: str = "INFO"
+    cors_origins_raw: str = Field(default="", validation_alias="CORS_ORIGINS")
+    db_bootstrap_on_start: bool = False
 
     # DB
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/interview"
 
-    # Ncloud 공통
+    # Ncloud common
     ncloud_access_key: str = ""
     ncloud_secret_key: str = ""
 
@@ -41,24 +44,24 @@ class Settings(BaseSettings):
     clova_speech_language: str = "ko-KR"
 
     # Embedding
-    # ncloud: Ncloud Embedding API 호출. mock: 결정적 의사 임베딩 (오프라인 테스트용).
+    # ncloud: calls the Ncloud Embedding API. mock: offline test mode.
     embedding_provider: Literal["ncloud", "mock"] = "ncloud"
     ncloud_embedding_api_url: str = ""
     ncloud_embedding_api_key: str = ""
     ncloud_embedding_model: str = "bge-m3"
     embedding_dimension: int = 1024
 
-    # Object Storage — 공통
+    # Object Storage common
     object_storage_endpoint: str = ""
     object_storage_region: str = "kr-standard"
 
-    # Object Storage — 음성 파일 전용
+    # Object Storage for voice files
     object_storage_bucket_voice: str = ""
     object_storage_access_key_voice: str = ""
     object_storage_secret_key_voice: str = ""
     local_storage_dir_voice: str = "./_storage/audio"
 
-    # Object Storage — 문서 파일 전용
+    # Object Storage for document files
     object_storage_bucket_document: str = ""
     object_storage_access_key_document: str = ""
     object_storage_secret_key_document: str = ""
@@ -79,6 +82,22 @@ class Settings(BaseSettings):
     @property
     def use_document_storage(self) -> bool:
         return bool(self.object_storage_endpoint and self.object_storage_bucket_document)
+
+    @property
+    def should_bootstrap_db(self) -> bool:
+        return self.app_env == "local" or self.db_bootstrap_on_start
+
+    @property
+    def cors_origins(self) -> list[str]:
+        raw = self.cors_origins_raw.strip()
+        if not raw:
+            return []
+        if raw.startswith("["):
+            parsed = json.loads(raw)
+            if not isinstance(parsed, list):
+                raise ValueError("CORS_ORIGINS must be a JSON array or comma-separated string.")
+            return [str(item).strip() for item in parsed if str(item).strip()]
+        return [item.strip() for item in raw.split(",") if item.strip()]
 
 
 @lru_cache(maxsize=1)
