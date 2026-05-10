@@ -31,9 +31,13 @@ def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
 
+    local_origins = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"] if settings.app_env == "local" else [],
+        allow_origins=local_origins if settings.app_env == "local" else [],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

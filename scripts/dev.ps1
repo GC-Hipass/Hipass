@@ -5,12 +5,12 @@
 #
 # Options:
 #   -SkipRun    Set up only, do not start uvicorn
-#   -Port N     Run port (default 8000)
+#   -Port N     Run port (default 8002)
 #   -Reinstall  Drop and recreate venv
 
 param(
     [switch]$SkipRun,
-    [int]$Port = 8000,
+    [int]$Port = 8002,
     [switch]$Reinstall
 )
 

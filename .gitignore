@@ -8,6 +8,7 @@ venv/
 
 # Local storage / artifacts
 _storage/
+_logs/
 *.log
 
 # IDE

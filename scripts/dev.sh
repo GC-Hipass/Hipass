@@ -16,7 +16,7 @@ VENV_DIR="$PROJECT_ROOT/.venv"
 VENV_PY="$VENV_DIR/bin/python"
 REQ_FILE="$PROJECT_ROOT/requirements.txt"
 REQ_HASH_FILE="$VENV_DIR/.requirements.sha256"
-PORT="${PORT:-8000}"
+PORT="${PORT:-8002}"
 
 skip_run=0
 reinstall=0

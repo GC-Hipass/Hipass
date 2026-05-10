@@ -39,7 +39,39 @@ app/
 
 ## 빠른 시작
 
-> 사전 조건: **Python 3.10 ~ 3.12** 설치 (`.python-version` 참고). PostgreSQL + pgvector 는 Ncloud 에 구축되어 있다고 가정.
+> 사전 조건: **Python 3.10 ~ 3.12**, **Node.js 18+**, **Docker Desktop**.
+
+### 한 번에 전체 스택 (DB + Backend + Frontend)
+
+```powershell
+# Windows
+powershell -ExecutionPolicy Bypass -File scripts\dev-all.ps1
+```
+
+```bash
+# Mac / Linux / WSL
+bash scripts/dev-all.sh
+```
+
+자동 처리:
+1. `docker compose up -d` — Postgres+pgvector 컨테이너 시작 (포트 6543)
+2. 백엔드 부트스트랩 후 `uvicorn` 실행 (포트 8002) — 새 PowerShell 창 / `_logs/backend.log`
+3. 프론트엔드 `npm install` (최초만) + `vite dev` 실행 (포트 5173) — 새 PowerShell 창 / `_logs/frontend.log`
+4. 브라우저로 `http://localhost:5173` 자동 열기 (`-NoBrowser` / `--no-browser` 로 끄기)
+
+종료:
+- Windows: 새로 열린 두 PowerShell 창 닫기 + `docker compose down`
+- Unix: Ctrl+C (백엔드/프론트 동시 종료) + `docker compose down`
+
+### 개별 실행
+
+| 대상 | Windows | Unix |
+| --- | --- | --- |
+| 백엔드만 | `scripts\dev.ps1` | `bash scripts/dev.sh` |
+| 프론트엔드만 | `cd frontend; npm run dev` | `cd frontend && npm run dev` |
+| DB만 | `docker compose up -d` | `docker compose up -d` |
+
+(아래 항목은 백엔드 단독 실행 기준 상세 설명. 프론트엔드는 [frontend/README.md](frontend/README.md))
 
 ### Windows (PowerShell)
 
@@ -63,7 +95,7 @@ bash scripts/dev.sh
 2. `.venv/` 생성 (없을 때만)
 3. `requirements.txt` 동기화 (해시 변경 시에만 재설치)
 4. `.env` 가 없으면 `.env.example` 복사 후 종료 → 키 채우고 다시 실행
-5. `uvicorn app.main:app --reload --port 8000` 실행
+5. `uvicorn app.main:app --reload --port 8002` 실행
 
 ### 옵션
 
@@ -77,12 +109,12 @@ bash scripts/dev.sh
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8002
 ```
 
 ### Swagger
 
-http://localhost:8000/docs
+http://localhost:8002/docs
 
 ### .env 필수 항목
 
@@ -95,6 +127,26 @@ http://localhost:8000/docs
 - `NCLOUD_EMBEDDING_API_URL` / `NCLOUD_EMBEDDING_API_KEY`
 
 `OBJECT_STORAGE_*` 는 비워두면 로컬 디스크(`_storage/`)에 저장 — 개발 시 편리.
+
+### 로컬 DB (임시)
+
+클라우드 DB에 접속할 수 없을 때만 사용. Docker 가 필요합니다.
+
+```bash
+docker compose up -d           # PostgreSQL 16 + pgvector 시작
+docker compose ps              # 상태 확인
+docker compose logs -f db      # 로그
+docker compose down            # 중지 (데이터 유지)
+docker compose down -v         # 중지 + 데이터 삭제
+```
+
+`.env.example` 의 기본 `DATABASE_URL` 이 이 컨테이너에 맞춰져 있어 별도 수정 불필요 (호스트 포트는 Windows Hyper-V 예약 영역 5358–5457 회피를 위해 **6543** 매핑):
+
+```
+DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:6543/interview
+```
+
+클라우드 DB 로 다시 전환할 땐 `.env` 의 `DATABASE_URL` 만 바꾸면 됩니다.
 
 ### 마이그레이션
 
