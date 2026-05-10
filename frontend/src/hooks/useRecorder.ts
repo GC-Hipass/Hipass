@@ -11,24 +11,25 @@ export interface RecordedClip {
 
 interface UseRecorderResult {
   state: RecorderState;
-  audioLevel: number; // 0~1, 실시간 음성 입력 레벨
+  audioLevel: number;
   error: string | null;
   start: () => Promise<void>;
   stop: () => Promise<RecordedClip | null>;
   release: () => void;
 }
 
-/** MediaRecorder + AnalyserNode 기반 음성 녹음. AudioContext로 실시간 레벨 추출. */
 export function useRecorder(): UseRecorderResult {
   const [state, setState] = useState<RecorderState>("idle");
   const [audioLevel, setAudioLevel] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const streamRef = useRef<MediaStream | null>(null);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<BlobPart[]>([]);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const muteGainRef = useRef<GainNode | null>(null);
+  const pcmChunksRef = useRef<Float32Array[]>([]);
   const rafRef = useRef<number | null>(null);
   const startedAtRef = useRef<number>(0);
 
@@ -39,14 +40,22 @@ export function useRecorder(): UseRecorderResult {
     analyserRef.current?.disconnect();
     analyserRef.current = null;
 
+    processorRef.current?.disconnect();
+    processorRef.current = null;
+
+    sourceRef.current?.disconnect();
+    sourceRef.current = null;
+
+    muteGainRef.current?.disconnect();
+    muteGainRef.current = null;
+
     audioCtxRef.current?.close().catch(() => {});
     audioCtxRef.current = null;
 
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
 
-    recorderRef.current = null;
-    chunksRef.current = [];
+    pcmChunksRef.current = [];
   }, []);
 
   useEffect(() => () => cleanup(), [cleanup]);
@@ -61,8 +70,8 @@ export function useRecorder(): UseRecorderResult {
       const d = buf[i] - 128;
       sum += d * d;
     }
-    const rms = Math.sqrt(sum / buf.length) / 128; // 0~1
-    setAudioLevel(Math.min(1, rms * 1.8)); // 시각적으로 잘 보이게 약간 증폭
+    const rms = Math.sqrt(sum / buf.length) / 128;
+    setAudioLevel(Math.min(1, rms * 1.8));
     rafRef.current = requestAnimationFrame(tickLevel);
   }, []);
 
@@ -72,67 +81,69 @@ export function useRecorder(): UseRecorderResult {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
-      // MIME 결정. webm/opus는 Chrome/Edge/Firefox 표준. Safari는 mp4.
-      const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
-      const mimeType =
-        candidates.find((m) => MediaRecorder.isTypeSupported(m)) || "";
-
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-      chunksRef.current = [];
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
-      recorderRef.current = recorder;
-
-      // AudioContext: 음성 레벨 시각화용
       const AudioCtx =
-        window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const ctx = new AudioCtx();
-      const src = ctx.createMediaStreamSource(stream);
+      const source = ctx.createMediaStreamSource(stream);
       const analyser = ctx.createAnalyser();
+      const processor = ctx.createScriptProcessor(4096, 1, 1);
+      const muteGain = ctx.createGain();
+      muteGain.gain.value = 0;
+
       analyser.fftSize = 1024;
-      src.connect(analyser);
+      source.connect(analyser);
+      source.connect(processor);
+      processor.connect(muteGain);
+      muteGain.connect(ctx.destination);
+
+      pcmChunksRef.current = [];
+      processor.onaudioprocess = (event) => {
+        const channel = event.inputBuffer.getChannelData(0);
+        pcmChunksRef.current.push(new Float32Array(channel));
+      };
+
       audioCtxRef.current = ctx;
       analyserRef.current = analyser;
+      sourceRef.current = source;
+      processorRef.current = processor;
+      muteGainRef.current = muteGain;
 
       startedAtRef.current = performance.now();
-      recorder.start(250);
       setState("recording");
       rafRef.current = requestAnimationFrame(tickLevel);
     } catch (e) {
-      setError((e as Error).message ?? "마이크 접근 실패");
+      setError((e as Error).message ?? "Microphone access failed");
       setState("error");
     }
   }, [tickLevel]);
 
   const stop = useCallback((): Promise<RecordedClip | null> => {
     return new Promise((resolve) => {
-      const recorder = recorderRef.current;
-      if (!recorder || recorder.state === "inactive") {
+      const ctx = audioCtxRef.current;
+      const chunks = pcmChunksRef.current;
+      if (!ctx || chunks.length === 0) {
         resolve(null);
         return;
       }
+
       setState("stopping");
-      recorder.onstop = () => {
-        const mimeType = recorder.mimeType || "audio/webm";
-        const blob = new Blob(chunksRef.current, { type: mimeType });
-        const ext = mimeType.includes("mp4") ? "mp4" : mimeType.includes("ogg") ? "ogg" : "webm";
-        const durationSeconds = Math.max(
-          1,
-          Math.round((performance.now() - startedAtRef.current) / 1000),
-        );
-        const clip: RecordedClip = {
-          blob,
-          filename: `answer.${ext}`,
-          mimeType,
-          durationSeconds,
-        };
-        cleanup();
-        setState("stopped");
-        setAudioLevel(0);
-        resolve(clip);
-      };
-      recorder.stop();
+      const wavBytes = encodeWav(chunks, ctx.sampleRate);
+      const blob = new Blob([wavBytes], { type: "audio/wav" });
+      const durationSeconds = Math.max(
+        1,
+        Math.round((performance.now() - startedAtRef.current) / 1000),
+      );
+
+      cleanup();
+      setState("stopped");
+      setAudioLevel(0);
+      resolve({
+        blob,
+        filename: "answer.wav",
+        mimeType: "audio/wav",
+        durationSeconds,
+      });
     });
   }, [cleanup]);
 
@@ -143,4 +154,48 @@ export function useRecorder(): UseRecorderResult {
   }, [cleanup]);
 
   return { state, audioLevel, error, start, stop, release };
+}
+
+function encodeWav(chunks: Float32Array[], sampleRate: number): ArrayBuffer {
+  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const pcm = new Int16Array(totalLength);
+  let offset = 0;
+
+  for (const chunk of chunks) {
+    for (let i = 0; i < chunk.length; i++) {
+      const sample = Math.max(-1, Math.min(1, chunk[i]));
+      pcm[offset++] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+    }
+  }
+
+  const buffer = new ArrayBuffer(44 + pcm.byteLength);
+  const view = new DataView(buffer);
+
+  writeAscii(view, 0, "RIFF");
+  view.setUint32(4, 36 + pcm.byteLength, true);
+  writeAscii(view, 8, "WAVE");
+  writeAscii(view, 12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeAscii(view, 36, "data");
+  view.setUint32(40, pcm.byteLength, true);
+
+  let byteOffset = 44;
+  for (let i = 0; i < pcm.length; i++) {
+    view.setInt16(byteOffset, pcm[i], true);
+    byteOffset += 2;
+  }
+
+  return buffer;
+}
+
+function writeAscii(view: DataView, offset: number, value: string) {
+  for (let i = 0; i < value.length; i++) {
+    view.setUint8(offset + i, value.charCodeAt(i));
+  }
 }
