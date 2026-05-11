@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import io
 import json
 import logging
+import struct
+import wave
 from abc import ABC, abstractmethod
 from functools import lru_cache
 
@@ -43,6 +46,7 @@ class ClovaSpeechProvider(STTProvider):
         if not s.clova_speech_api_url or not s.clova_speech_secret:
             raise STTFailed("Clova Speech environment variables are not configured.")
 
+        audio_bytes = self._normalize_wav_for_stt(audio_bytes, content_type)
         url = s.clova_speech_api_url.rstrip("/")
         if url.endswith("/stt"):
             return self._transcribe_csr(
@@ -89,8 +93,13 @@ class ClovaSpeechProvider(STTProvider):
                 },
             )
             resp.raise_for_status()
-            text = self._extract_text(resp.json())
+            data = resp.json()
+            text = self._extract_text(data)
             if not text:
+                logger.warning(
+                    "clova speech upload returned empty transcript: %s",
+                    self._summarize_response(data),
+                )
                 raise STTFailed("Unexpected empty STT response.")
             return text
         except httpx.HTTPError as e:
@@ -116,8 +125,13 @@ class ClovaSpeechProvider(STTProvider):
                 content=audio_bytes,
             )
             resp.raise_for_status()
-            text = self._extract_text(resp.json())
+            data = resp.json()
+            text = self._extract_text(data)
             if not text:
+                logger.warning(
+                    "clova speech csr returned empty transcript: %s",
+                    self._summarize_response(data),
+                )
                 raise STTFailed("Unexpected empty STT response.")
             return text
         except httpx.HTTPError as e:
@@ -176,12 +190,95 @@ class ClovaSpeechProvider(STTProvider):
                 parts: list[str] = []
                 for item in segments:
                     if isinstance(item, dict):
-                        segment_text = item.get("text")
+                        segment_text = item.get("text") or item.get("textEdited")
                         if isinstance(segment_text, str) and segment_text.strip():
                             parts.append(segment_text.strip())
+                            continue
+
+                        words = item.get("words")
+                        if isinstance(words, list):
+                            for word in words:
+                                if (
+                                    isinstance(word, list)
+                                    and len(word) >= 3
+                                    and isinstance(word[2], str)
+                                    and word[2].strip()
+                                ):
+                                    parts.append(word[2].strip())
                 if parts:
                     return " ".join(parts)
         return ""
+
+    @staticmethod
+    def _normalize_wav_for_stt(audio_bytes: bytes, content_type: str) -> bytes:
+        normalized_type = (content_type or "").split(";")[0].strip().lower()
+        is_wav = normalized_type in {"audio/wav", "audio/x-wav"} or (
+            audio_bytes[:4] == b"RIFF" and audio_bytes[8:12] == b"WAVE"
+        )
+        if not is_wav:
+            return audio_bytes
+
+        try:
+            source = io.BytesIO(audio_bytes)
+            with wave.open(source, "rb") as reader:
+                params = reader.getparams()
+                if reader.getcomptype() != "NONE" or reader.getsampwidth() != 2:
+                    return audio_bytes
+                frames = reader.readframes(reader.getnframes())
+
+            if not frames:
+                return audio_bytes
+
+            sample_count = len(frames) // 2
+            samples = struct.unpack(f"<{sample_count}h", frames)
+            peak = max(abs(sample) for sample in samples)
+            if peak == 0:
+                return audio_bytes
+
+            target_peak = int(32767 * 0.85)
+            gain = min(12.0, target_peak / peak)
+            if gain <= 1.25:
+                return audio_bytes
+
+            amplified = bytearray(len(frames))
+            for index, sample in enumerate(samples):
+                value = int(sample * gain)
+                value = max(-32768, min(32767, value))
+                struct.pack_into("<h", amplified, index * 2, value)
+
+            output = io.BytesIO()
+            with wave.open(output, "wb") as writer:
+                writer.setparams(params)
+                writer.writeframes(bytes(amplified))
+
+            logger.info(
+                "normalized wav for stt: peak=%d gain=%.2f sample_rate=%d channels=%d",
+                peak,
+                gain,
+                params.framerate,
+                params.nchannels,
+            )
+            return output.getvalue()
+        except (EOFError, wave.Error, struct.error, ValueError) as e:
+            logger.warning("failed to normalize wav for stt: %s", e)
+            return audio_bytes
+
+    @staticmethod
+    def _summarize_response(data: object) -> str:
+        if not isinstance(data, dict):
+            return repr(data)[:1000]
+
+        summary = {
+            "result": data.get("result"),
+            "message": data.get("message"),
+            "progress": data.get("progress"),
+            "text": data.get("text"),
+            "confidence": data.get("confidence"),
+            "segments_count": len(data.get("segments", []))
+            if isinstance(data.get("segments"), list)
+            else None,
+        }
+        return json.dumps(summary, ensure_ascii=False)
 
 
 class MockSTTProvider(STTProvider):
