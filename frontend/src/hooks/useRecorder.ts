@@ -77,7 +77,10 @@ export function useRecorder(): UseRecorderResult {
 
   const start = useCallback(async () => {
     setError(null);
+
     try {
+      cleanup();
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
@@ -113,10 +116,13 @@ export function useRecorder(): UseRecorderResult {
       setState("recording");
       rafRef.current = requestAnimationFrame(tickLevel);
     } catch (e) {
+      cleanup();
+      setAudioLevel(0);
       setError((e as Error).message ?? "Microphone access failed");
       setState("error");
+      throw e;
     }
-  }, [tickLevel]);
+  }, [cleanup, tickLevel]);
 
   const stop = useCallback((): Promise<RecordedClip | null> => {
     return new Promise((resolve) => {

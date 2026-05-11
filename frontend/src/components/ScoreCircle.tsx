@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 import styles from "./ScoreCircle.module.css";
 
 interface ScoreCircleProps {
@@ -5,42 +7,42 @@ interface ScoreCircleProps {
   score: number;
   /** A/B/C/D/F 등 등급 */
   grade: string;
+  size?: number;
 }
 
-const SIZE = 180;
-const STROKE = 14;
-const RADIUS = (SIZE - STROKE) / 2;
-const CIRC = 2 * Math.PI * RADIUS;
-
-export default function ScoreCircle({ score, grade }: ScoreCircleProps) {
+export default function ScoreCircle({ score, grade, size = 180 }: ScoreCircleProps) {
+  const gradientId = useId();
   const clamped = Math.max(0, Math.min(100, score));
-  const offset = CIRC * (1 - clamped / 100);
+  const stroke = Math.max(12, Math.round(size * 0.078));
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - clamped / 100);
 
   return (
-    <div className={styles.wrap} style={{ width: SIZE, height: SIZE }}>
-      <svg width={SIZE} height={SIZE} className={styles.svg}>
+    <div className={styles.wrap} style={{ width: size, height: size }}>
+      <svg width={size} height={size} className={styles.svg}>
         <circle
-          cx={SIZE / 2}
-          cy={SIZE / 2}
-          r={RADIUS}
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
           stroke="rgba(255,255,255,0.18)"
-          strokeWidth={STROKE}
+          strokeWidth={stroke}
           fill="none"
         />
         <circle
-          cx={SIZE / 2}
-          cy={SIZE / 2}
-          r={RADIUS}
-          stroke="url(#scoreGrad)"
-          strokeWidth={STROKE}
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={`url(#${gradientId})`}
+          strokeWidth={stroke}
           strokeLinecap="round"
           fill="none"
-          strokeDasharray={CIRC}
+          strokeDasharray={circumference}
           strokeDashoffset={offset}
-          transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
         />
         <defs>
-          <linearGradient id="scoreGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#a8bbff" />
             <stop offset="100%" stopColor="#ffffff" />
           </linearGradient>

@@ -65,14 +65,47 @@ export function useDeviceCheck(): UseDeviceCheckResult {
     setAudioLevel(0);
   }, []);
 
+  const attachStream = useCallback(
+    async (stream: MediaStream) => {
+      streamRef.current = stream;
+
+      const hasAudio = stream.getAudioTracks().length > 0;
+      const hasVideo = stream.getVideoTracks().length > 0;
+
+      setMicActive(hasAudio);
+      setCameraActive(hasVideo);
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = hasVideo ? stream : null;
+        if (hasVideo) await videoRef.current.play().catch(() => {});
+      }
+
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext;
+      const ctx = new AudioCtx();
+      const src = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      src.connect(analyser);
+      audioCtxRef.current = ctx;
+      analyserRef.current = analyser;
+      rafRef.current = requestAnimationFrame(tick);
+    },
+    [tick],
+  );
+
   // 컴포넌트 unmount 시 한 번만 정리.
   useEffect(() => () => release(), [release]);
 
   const attachVideo = useCallback((el: HTMLVideoElement | null) => {
     videoRef.current = el;
-    if (el && streamRef.current) {
+    if (el && streamRef.current?.getVideoTracks().length) {
       el.srcObject = streamRef.current;
       el.play().catch(() => {});
+    } else if (el) {
+      el.srcObject = null;
     }
   }, []);
 
@@ -91,31 +124,17 @@ export function useDeviceCheck(): UseDeviceCheckResult {
         video: { width: 640, height: 480 },
         audio: true,
       });
-      streamRef.current = next;
-      setMicActive(next.getAudioTracks().length > 0);
-      setCameraActive(next.getVideoTracks().length > 0);
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = next;
-        await videoRef.current.play().catch(() => {});
+      await attachStream(next);
+    } catch {
+      try {
+        const audioOnly = await navigator.mediaDevices.getUserMedia({ audio: true });
+        await attachStream(audioOnly);
+      } catch (e) {
+        release();
+        setError((e as Error).message ?? "장치 접근에 실패했습니다.");
       }
-
-      const AudioCtx =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext })
-          .webkitAudioContext;
-      const ctx = new AudioCtx();
-      const src = ctx.createMediaStreamSource(next);
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 1024;
-      src.connect(analyser);
-      audioCtxRef.current = ctx;
-      analyserRef.current = analyser;
-      rafRef.current = requestAnimationFrame(tick);
-    } catch (e) {
-      setError((e as Error).message ?? "장치 접근에 실패했습니다.");
     }
-  }, [tick]);
+  }, [attachStream, release]);
 
   return { micActive, cameraActive, audioLevel, error, request, release, attachVideo };
 }

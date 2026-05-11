@@ -6,8 +6,8 @@ export type JobRole = "app" | "web" | "ai" | "devops";
 
 export interface UploadResponse {
   session_id: number;
-  document_id: number;
-  file_type: string;
+  document_id: number | null;
+  file_type: string | null;
   company: Company;
   difficulty: Difficulty;
   job_role: JobRole;

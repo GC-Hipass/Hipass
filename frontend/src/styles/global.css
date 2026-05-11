@@ -16,7 +16,9 @@ body,
 body {
   font-family: var(--font-sans);
   color: var(--text);
-  background: var(--surface-alt);
+  background:
+    radial-gradient(circle at top left, rgba(34, 64, 255, 0.08), transparent 28%),
+    linear-gradient(180deg, #f8faff 0%, #eef3ff 100%);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-size: 16px;
@@ -26,6 +28,8 @@ body {
 button {
   font: inherit;
   cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 input,
@@ -37,6 +41,15 @@ textarea {
 a {
   color: inherit;
   text-decoration: none;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 img,
@@ -53,7 +66,11 @@ p {
   margin: 0;
 }
 
-/* Utility: 시각적 숨김 (스크린 리더는 읽음) */
+::selection {
+  background: rgba(34, 64, 255, 0.16);
+}
+
+/* Utility: 시각적으로 숨김 (스크린 리더는 읽음) */
 .sr-only {
   position: absolute;
   width: 1px;
