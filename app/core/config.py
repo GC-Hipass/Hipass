@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     ncloud_embedding_api_url: str = ""
     ncloud_embedding_api_key: str = ""
     ncloud_embedding_model: str = "bge-m3"
-    embedding_dimension: int = 1024
+    embedding_dimension: int = 384
 
     # Object Storage common
     object_storage_endpoint: str = ""

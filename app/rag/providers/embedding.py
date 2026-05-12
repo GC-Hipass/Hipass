@@ -7,6 +7,7 @@ from functools import lru_cache
 
 import httpx
 import numpy as np
+from sentence_transformers import SentenceTransformer  # 모델 로드용 추가
 
 from app.core.config import Settings, get_settings
 from app.core.exceptions import EmbeddingFailed
@@ -26,19 +27,32 @@ class EmbeddingProvider(ABC):
     def embed_batch(self, texts: list[str]) -> list[list[float]]: ...
 
 
-class NcloudEmbeddingProvider(EmbeddingProvider):
-    """Ncloud 임베딩 모델 클라이언트.
-
-    실제 Ncloud Embedding API 스펙에 맞게 _request payload를 조정한다.
+class LocalEmbeddingProvider(EmbeddingProvider):
+    """로컬 SentenceTransformer 모델 기반 임베딩 프로바이더.
+    
+    모델을 메모리에 올리고 싱글톤 형태로 유지하여 API 호출 없이 로컬 CPU에서 처리합니다.
     """
 
     def __init__(self, settings: Settings):
         self._settings = settings
-        self._client = httpx.Client(timeout=30.0)
+        # 모델 이름 지정
+        self.model_name = "paraphrase-multilingual-MiniLM-L12-v2"
+        
+        try:
+            logger.info(f"Loading local embedding model: {self.model_name}...")
+            # 모델 로드 (최초 1회 다운로드 후 캐시됨)
+            # 4GB RAM 환경이므로 device='cpu'를 명시적으로 설정하는 것이 안전합니다.
+            self._model = SentenceTransformer(self.model_name, device='cpu')
+            logger.info("Model loaded successfully.")
+        except Exception as e:
+            logger.error(f"Failed to load embedding model: {e}")
+            raise EmbeddingFailed(f"모델 로드 실패: {str(e)}")
 
     @property
     def dimension(self) -> int:
-        return self._settings.embedding_dimension
+        # 이 모델의 차원은 384입니다. 
+        # 하드코딩 대신 모델에서 직접 가져오도록 설정합니다.
+        return self._model.get_sentence_embedding_dimension()
 
     def embed(self, text: str) -> list[float]:
         return self.embed_batch([text])[0]
@@ -46,41 +60,19 @@ class NcloudEmbeddingProvider(EmbeddingProvider):
     def embed_batch(self, texts: list[str]) -> list[list[float]]:
         if not texts:
             return []
-        if not self._settings.ncloud_embedding_api_url or not self._settings.ncloud_embedding_api_key:
-            raise EmbeddingFailed("Ncloud Embedding 환경변수가 설정되지 않았습니다.")
-
-        headers = {
-            "Authorization": f"Bearer {self._settings.ncloud_embedding_api_key}",
-            "Content-Type": "application/json",
-        }
-        results: list[list[float]] = []
-        # Ncloud 임베딩은 단건/배치 스펙이 모델별로 다름. 여기서는 단건 호출 루프.
-        for text in texts:
-            try:
-                resp = self._client.post(
-                    self._settings.ncloud_embedding_api_url,
-                    headers=headers,
-                    json={"text": text},
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                vec = data.get("result", {}).get("embedding") or data.get("embedding")
-                if not vec:
-                    raise EmbeddingFailed(f"임베딩 응답이 비어 있습니다: {data}")
-                results.append(vec)
-            except httpx.HTTPError as e:
-                logger.exception("embedding request failed")
-                raise EmbeddingFailed(str(e)) from e
-        return results
+        
+        try:
+            # 모델을 사용하여 임베딩 생성
+            embeddings = self._model.encode(texts)
+            # numpy array를 list로 변환하여 반환
+            return embeddings.tolist()
+        except Exception as e:
+            logger.exception("Local embedding generation failed")
+            raise EmbeddingFailed(f"임베딩 생성 오류: {str(e)}")
 
 
 class MockEmbeddingProvider(EmbeddingProvider):
-    """결정적 mock 임베딩.
-
-    - 같은 텍스트는 항상 같은 벡터를 반환한다 (해시 기반 시드).
-    - 의미적 유사도는 보장되지 않는다 — 데이터 흐름/저장/검색 코드 경로를 검증하기 위한 용도.
-    """
-
+    """결정적 mock 임베딩 (테스트용)"""
     def __init__(self, settings: Settings):
         self._dim = settings.embedding_dimension
 
@@ -107,8 +99,15 @@ class MockEmbeddingProvider(EmbeddingProvider):
 
 @lru_cache(maxsize=1)
 def get_embedding_provider() -> EmbeddingProvider:
+    """싱글톤 방식으로 프로바이더를 제공합니다. 
+    @lru_cache(maxsize=1) 덕분에 모델 로드는 한 번만 일어납니다.
+    """
     settings = get_settings()
+    
     if settings.embedding_provider == "mock":
         logger.info("embedding provider: MOCK (deterministic, offline)")
         return MockEmbeddingProvider(settings)
-    return NcloudEmbeddingProvider(settings)
+    
+    # 기본값을 로컬 모델 프로바이더로 사용
+    logger.info("embedding provider: LOCAL (SentenceTransformer)")
+    return LocalEmbeddingProvider(settings)
