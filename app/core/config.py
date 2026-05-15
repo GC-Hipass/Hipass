@@ -27,10 +27,11 @@ class Settings(BaseSettings):
     ncloud_access_key: str = ""
     ncloud_secret_key: str = ""
 
-    # Clova X (LLM)
-    clova_x_api_url: str = "https://clovastudio.stream.ntruss.com"
-    clova_x_api_key: str = ""
-    clova_x_model: str = "HCX-005"
+    # LLM routing
+    llm_provider: Literal["external", "mock"] = "external"
+    llm_server_url: str = ""
+    llm_server_api_key: str = ""
+    llm_request_timeout_seconds: float = 120.0
 
     # Clova Voice (TTS)
     clova_voice_api_url: str = "https://naveropenapi.apigw.ntruss.com/tts-premium/v1/tts"
@@ -39,6 +40,7 @@ class Settings(BaseSettings):
     clova_voice_speaker: str = "nara"
 
     # Clova Speech (STT)
+    stt_provider: Literal["clova", "mock"] = "clova"
     clova_speech_api_url: str = ""
     clova_speech_secret: str = ""
     clova_speech_language: str = "ko-KR"

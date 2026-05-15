@@ -121,7 +121,6 @@ http://localhost:8002/docs
 `.env.example` 의 모든 항목 중 다음만 채우면 동작:
 
 - `DATABASE_URL` — Ncloud Postgres + pgvector 접속 URL (`postgresql+psycopg://...`)
-- `CLOVA_X_API_KEY`
 - `CLOVA_VOICE_CLIENT_ID` / `CLOVA_VOICE_CLIENT_SECRET`
 - `CLOVA_SPEECH_API_URL` / `CLOVA_SPEECH_SECRET`
 - `NCLOUD_EMBEDDING_API_URL` / `NCLOUD_EMBEDDING_API_KEY`
