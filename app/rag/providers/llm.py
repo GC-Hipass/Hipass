@@ -6,7 +6,6 @@ import re
 from abc import ABC, abstractmethod
 from functools import lru_cache
 from typing import Any
-from uuid import uuid4
 
 import httpx
 
@@ -46,54 +45,41 @@ def parse_json_loose(text: str) -> Any:
         return json.loads(text[start:])
 
 
-class ClovaXProvider(LLMProvider):
-    """Naver Clova X (HyperCLOVA X) chat completion 호출."""
+class ExternalLLMProvider(LLMProvider):
+    """내부 로컬 LLM 서버를 호출하는 Provider."""
 
     def __init__(self, settings: Settings):
         self._settings = settings
-        self._client = httpx.Client(timeout=60.0)
+        self._client = httpx.Client(timeout=settings.llm_request_timeout_seconds)
 
     def generate(self, prompt: str, *, system: str | None = None, temperature: float = 0.5) -> str:
-        if not self._settings.clova_x_api_key:
-            raise LLMEvaluationFailed("Clova X API 키가 설정되지 않았습니다.")
+        if not self._settings.llm_server_url:
+            raise LLMEvaluationFailed("LLM_SERVER_URL이 설정되지 않았습니다.")
 
-        url = (
-            f"{self._settings.clova_x_api_url.rstrip('/')}"
-            f"/v3/chat-completions/{self._settings.clova_x_model}"
-        )
-        headers = {
-            "Authorization": f"Bearer {self._settings.clova_x_api_key}",
-            "X-NCP-CLOVASTUDIO-REQUEST-ID": str(uuid4()),
-            "Content-Type": "application/json",
-        }
-        messages = []
-        if system:
-            messages.append(
-                {"role": "system", "content": [{"type": "text", "text": system}]}
-            )
-        messages.append(
-            {"role": "user", "content": [{"type": "text", "text": prompt}]}
-        )
+        base_url = self._settings.llm_server_url.rstrip("/")
+        url = base_url if base_url.endswith("/generate") else f"{base_url}/generate"
+        headers = {"Content-Type": "application/json"}
+        if self._settings.llm_server_api_key:
+            headers["X-Internal-API-Key"] = self._settings.llm_server_api_key
 
         body = {
-            "messages": messages,
-            "topP": 0.8,
-            "topK": 0,
-            "maxTokens": 2048,
+            "prompt": prompt,
+            "system": system,
             "temperature": temperature,
-            "repetitionPenalty": 1.1,
-            "stop": [],
         }
         try:
             resp = self._client.post(url, headers=headers, json=body)
             resp.raise_for_status()
             data = resp.json()
-            return data["result"]["message"]["content"]
+            text = data["text"]
+            if not isinstance(text, str):
+                raise TypeError("text must be a string")
+            return text
         except httpx.HTTPError as e:
-            logger.exception("clova x request failed")
+            logger.exception("external llm request failed")
             raise LLMEvaluationFailed(str(e)) from e
         except (KeyError, TypeError) as e:
-            raise LLMEvaluationFailed(f"Clova X 응답 형식 오류: {e}") from e
+            raise LLMEvaluationFailed(f"External LLM 응답 형식 오류: {e}") from e
 
 
 class MockLLMProvider(LLMProvider):
@@ -141,7 +127,8 @@ class MockLLMProvider(LLMProvider):
 @lru_cache(maxsize=1)
 def get_llm_provider() -> LLMProvider:
     s = get_settings()
-    if not s.clova_x_api_key:
-        logger.warning("CLOVA_X_API_KEY not set — using MockLLMProvider")
+    if s.llm_provider == "mock":
+        logger.warning("LLM_PROVIDER=mock — using MockLLMProvider")
         return MockLLMProvider()
-    return ClovaXProvider(s)
+    logger.info("LLM_PROVIDER=external — using ExternalLLMProvider")
+    return ExternalLLMProvider(s)

@@ -2,10 +2,10 @@
 
 각 질문에 대해:
   1) 검색 문맥 조회
-  2) 모범답안 생성 (Clova X)
+  2) 모범답안 생성 (LLM Provider)
   3) 사용자 답변 임베딩 + 모범답안 임베딩 -> semantic similarity
   4) 핵심 키워드 포함 여부 분석
-  5) Clova X로 정성 평가 + scores JSON 반환
+  5) LLM Provider로 정성 평가 + scores JSON 반환
   6) 최종 점수 합산 (가중 평균)
 
 전체 5문항이 끝나면 final analysis (요약/강점/약점/추천)를 한 번 더 호출.

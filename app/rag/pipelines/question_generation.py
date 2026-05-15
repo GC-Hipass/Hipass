@@ -9,7 +9,7 @@ START
   ↓ Retrieve Technical Context
   ↓ Retrieve Uploaded Document Context
   ↓ Retrieve Company Context
-  ↓ Generate 5 Questions (Clova X)
+  ↓ Generate 5 Questions (LLM Provider)
   ↓ Validate Question Types
 END
 """

@@ -296,6 +296,9 @@ class MockSTTProvider(STTProvider):
 @lru_cache(maxsize=1)
 def get_stt_provider() -> STTProvider:
     s = get_settings()
+    if s.stt_provider == "mock":
+        logger.warning("STT_PROVIDER=mock -> using MockSTTProvider")
+        return MockSTTProvider()
     if not s.clova_speech_api_url or not s.clova_speech_secret:
         logger.warning("Clova Speech credentials not set -> using MockSTTProvider")
         return MockSTTProvider()

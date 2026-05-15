@@ -16,8 +16,8 @@
 | 문서 파싱 | PDF, DOCX, TXT parser |
 | TTS | Ncloud Clova Voice |
 | STT | Ncloud Clova Speech |
-| LLM | Naver CLOVA X |
-| Embedding Model | Ncloud Embedding Model |
+| LLM | External ncloud-llm server |
+| Embedding Model | Local SentenceTransformer (`paraphrase-multilingual-MiniLM-L12-v2`) |
 | Vector DB | Ncloud Vector DB 또는 PostgreSQL + pgvector |
 | Orchestration | LangGraph |
 | DB | PostgreSQL |
@@ -31,7 +31,7 @@
 | 녹음 시간 | 질문당 30초 |
 | 질문 안내 | Clova Voice TTS |
 | 답변 인식 | Clova Speech STT |
-| 평가 방식 | RAG + CLOVA X |
+| 평가 방식 | RAG + external LLM |
 | 결과 | 점수, 질문/답변 목록, 잘한 점, 부족한 점, 개선점 |
 
 ## 4. 사용자 흐름
@@ -421,7 +421,7 @@ Reranking
    ↓
 Prompt Augmentation
    ↓
-CLOVA X Question Generation
+External LLM Question Generation
    ↓
 Clova Voice TTS 생성
    ↓
@@ -564,7 +564,7 @@ Score + Feedback 반환
 3. 사용자 답변 embedding 생성
 4. 모범답안과 사용자 답변 semantic similarity 비교
 5. 핵심 키워드 포함 여부 분석
-6. CLOVA X로 정성 평가 생성
+6. 외부 LLM으로 정성 평가 생성
 7. 문항별 점수 산출
 8. 전체 점수 합산
 ```

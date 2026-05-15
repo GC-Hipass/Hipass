@@ -5,9 +5,8 @@ import logging
 from abc import ABC, abstractmethod
 from functools import lru_cache
 
-import httpx
 import numpy as np
-from sentence_transformers import SentenceTransformer  # 모델 로드용 추가
+from sentence_transformers import SentenceTransformer
 
 from app.core.config import Settings, get_settings
 from app.core.exceptions import EmbeddingFailed
@@ -28,30 +27,22 @@ class EmbeddingProvider(ABC):
 
 
 class LocalEmbeddingProvider(EmbeddingProvider):
-    """로컬 SentenceTransformer 모델 기반 임베딩 프로바이더.
-    
-    모델을 메모리에 올리고 싱글톤 형태로 유지하여 API 호출 없이 로컬 CPU에서 처리합니다.
-    """
+    """Embedding provider backed by a local SentenceTransformer model."""
 
     def __init__(self, settings: Settings):
         self._settings = settings
-        # 모델 이름 지정
         self.model_name = "paraphrase-multilingual-MiniLM-L12-v2"
-        
+
         try:
-            logger.info(f"Loading local embedding model: {self.model_name}...")
-            # 모델 로드 (최초 1회 다운로드 후 캐시됨)
-            # 4GB RAM 환경이므로 device='cpu'를 명시적으로 설정하는 것이 안전합니다.
-            self._model = SentenceTransformer(self.model_name, device='cpu')
+            logger.info("Loading local embedding model: %s...", self.model_name)
+            self._model = SentenceTransformer(self.model_name, device="cpu")
             logger.info("Model loaded successfully.")
         except Exception as e:
-            logger.error(f"Failed to load embedding model: {e}")
-            raise EmbeddingFailed(f"모델 로드 실패: {str(e)}")
+            logger.error("Failed to load embedding model: %s", e)
+            raise EmbeddingFailed(f"Failed to load embedding model: {str(e)}")
 
     @property
     def dimension(self) -> int:
-        # 이 모델의 차원은 384입니다. 
-        # 하드코딩 대신 모델에서 직접 가져오도록 설정합니다.
         return self._model.get_sentence_embedding_dimension()
 
     def embed(self, text: str) -> list[float]:
@@ -60,19 +51,17 @@ class LocalEmbeddingProvider(EmbeddingProvider):
     def embed_batch(self, texts: list[str]) -> list[list[float]]:
         if not texts:
             return []
-        
+
         try:
-            # 모델을 사용하여 임베딩 생성
             embeddings = self._model.encode(texts)
-            # numpy array를 list로 변환하여 반환
             return embeddings.tolist()
         except Exception as e:
             logger.exception("Local embedding generation failed")
-            raise EmbeddingFailed(f"임베딩 생성 오류: {str(e)}")
+            raise EmbeddingFailed(f"Embedding generation failed: {str(e)}")
 
 
 class MockEmbeddingProvider(EmbeddingProvider):
-    """결정적 mock 임베딩 (테스트용)"""
+    """Deterministic mock embeddings for smoke tests."""
     def __init__(self, settings: Settings):
         self._dim = settings.embedding_dimension
 
@@ -99,15 +88,18 @@ class MockEmbeddingProvider(EmbeddingProvider):
 
 @lru_cache(maxsize=1)
 def get_embedding_provider() -> EmbeddingProvider:
-    """싱글톤 방식으로 프로바이더를 제공합니다. 
-    @lru_cache(maxsize=1) 덕분에 모델 로드는 한 번만 일어납니다.
-    """
+    """Return the configured embedding provider as a cached singleton."""
     settings = get_settings()
-    
+
     if settings.embedding_provider == "mock":
         logger.info("embedding provider: MOCK (deterministic, offline)")
         return MockEmbeddingProvider(settings)
-    
-    # 기본값을 로컬 모델 프로바이더로 사용
+
+    if settings.embedding_provider == "ncloud":
+        logger.warning(
+            "EMBEDDING_PROVIDER=ncloud is a legacy alias for local SentenceTransformer; "
+            "Ncloud Embedding API is not implemented."
+        )
+
     logger.info("embedding provider: LOCAL (SentenceTransformer)")
     return LocalEmbeddingProvider(settings)
