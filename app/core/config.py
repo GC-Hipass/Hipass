@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     local_storage_dir_document: str = "./_storage/documents"
 
     # RAG
-    chunk_size: int = 800
+    chunk_size: int = 350
     chunk_overlap: int = 120
     retrieval_top_k: int = 8
     rerank_top_k: int = 4
