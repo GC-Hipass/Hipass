@@ -1,188 +1,163 @@
-# navercloud-ai
+# Hipass AI Interview Backend
 
-문서 기반 RAG 면접 평가 서비스 (FastAPI + Ncloud).
+문서 기반 RAG 면접 질문 생성 및 답변 평가 서비스입니다.
 
-서비스/도메인 명세는 [`CLAUDE.md`](./CLAUDE.md), RAG 파이프라인 개요는 [`RAG.md`](./RAG.md) 참고.
+FastAPI 백엔드는 문서 업로드, 질문 생성, TTS/STT, 답변 저장, 평가 결과 조회를 담당하고,
+LLM 추론은 별도 `ncloud-llm` 서버를 HTTP로 호출합니다.
 
----
+## Architecture
 
-## 디렉토리 구조
+```text
+Frontend (Vercel)
+  -> Nginx web server: 101.79.17.102
+  -> FastAPI app server: 10.0.2.6:8000
+  -> LLM API server: 10.0.4.6:8000
+  -> Ollama: 127.0.0.1:11434
 
-```
-app/
-├── api/                # FastAPI 라우팅 (HTTP I/O 전용)
-│   └── v1/endpoints/   # upload, questions, audio, evaluate, result
-├── core/               # 설정, 예외, 로깅, 에러 핸들러
-├── db/                 # SQLAlchemy 세션 + ORM 모델
-│   └── models/         # documents, chunks, sessions, questions, answers, evaluations, knowledge
-├── schemas/            # Pydantic I/O 스키마
-├── services/           # 도메인 비즈니스 로직 (API ↔ RAG 가교)
-└── rag/                # RAG 모듈 (API와 독립)
-    ├── parser/         # PDF/DOCX/TXT 텍스트 추출
-    ├── chunker/        # 텍스트 분할
-    ├── embedding (providers/embedding)  # Local SentenceTransformer Embedding
-    ├── vectorstore/    # pgvector
-    ├── retrieval/      # Hybrid + Rerank
-    ├── prompts/        # 질문 생성 / 답변 평가 프롬프트
-    ├── providers/      # LLM·TTS·STT·ObjectStorage 추상화
-    └── pipelines/      # LangGraph 질문 생성, 답변 평가
+FastAPI app server
+  -> PostgreSQL + pgvector: 10.0.3.7:5432
 ```
 
-### 계층 규칙
+## Main Runtime Choices
 
-- `api` → `services` 만 호출 (RAG 직접 호출 금지)
-- `services` → `rag.pipelines` / `rag.indexing` / `rag.providers` / `db.models`
-- `rag/*` 는 외부 모듈을 import하지 않음 (단, `db.models`만 사용 — pgvector 컬럼 정의 공유 목적)
-- 외부 연동(LLM 서버, Clova STT/TTS, Object Storage)은 모두 `rag/providers/` 의 추상 클래스 뒤에 숨김 → 구현체 교체 시 `factory`만 수정
+| Area | Current implementation |
+| --- | --- |
+| Backend | FastAPI |
+| DB | PostgreSQL + pgvector |
+| LLM | External `ncloud-llm` server |
+| LLM runtime | Ollama |
+| Current model | `qwen2.5:1.5b` |
+| Embedding | Local SentenceTransformer |
+| Embedding model | `paraphrase-multilingual-MiniLM-L12-v2` |
+| TTS | Ncloud Clova Voice |
+| STT | Ncloud Clova Speech |
+| Document storage | Local filesystem by default, Object Storage optional |
 
----
+## Important Environment
 
-## 빠른 시작
+```env
+APP_ENV=prod
+DATABASE_URL=postgresql+psycopg://hpuser:<URL_ENCODED_PASSWORD>@10.0.3.7:5432/hpdb
 
-> 사전 조건: **Python 3.10 ~ 3.12**, **Node.js 18+**, **Docker Desktop**.
+LLM_PROVIDER=external
+LLM_SERVER_URL=http://10.0.4.6:8000
+LLM_REQUEST_TIMEOUT_SECONDS=180
 
-### 한 번에 전체 스택 (DB + Backend + Frontend)
+EMBEDDING_PROVIDER=local
+EMBEDDING_DIMENSION=384
+
+STT_PROVIDER=clova
+```
+
+`NCLOUD_EMBEDDING_API_URL` and `NCLOUD_EMBEDDING_API_KEY` may exist in env files for compatibility,
+but the current backend uses the local SentenceTransformer embedding provider.
+
+## Local Development
 
 ```powershell
-# Windows
-powershell -ExecutionPolicy Bypass -File scripts\dev-all.ps1
+cd C:\Users\ksyzi\PycharmProjects\ncloud\navercloud-ai
+
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8002
 ```
+
+Swagger:
+
+```text
+http://127.0.0.1:8002/docs
+```
+
+Frontend local dev normally proxies to backend port `8002`.
+
+## Production Services
+
+App server:
 
 ```bash
-# Mac / Linux / WSL
-bash scripts/dev-all.sh
+systemctl status hipass-app --no-pager
+journalctl -u hipass-app -f
+systemctl restart hipass-app
 ```
 
-자동 처리:
-1. `docker compose up -d` — Postgres+pgvector 컨테이너 시작 (포트 6543)
-2. 백엔드 부트스트랩 후 `uvicorn` 실행 (포트 8002) — 새 PowerShell 창 / `_logs/backend.log`
-3. 프론트엔드 `npm install` (최초만) + `vite dev` 실행 (포트 5173) — 새 PowerShell 창 / `_logs/frontend.log`
-4. 브라우저로 `http://localhost:5173` 자동 열기 (`-NoBrowser` / `--no-browser` 로 끄기)
-
-종료:
-- Windows: 새로 열린 두 PowerShell 창 닫기 + `docker compose down`
-- Unix: Ctrl+C (백엔드/프론트 동시 종료) + `docker compose down`
-
-### 개별 실행
-
-| 대상 | Windows | Unix |
-| --- | --- | --- |
-| 백엔드만 | `scripts\dev.ps1` | `bash scripts/dev.sh` |
-| 프론트엔드만 | `cd frontend; npm run dev` | `cd frontend && npm run dev` |
-| DB만 | `docker compose up -d` | `docker compose up -d` |
-
-(아래 항목은 백엔드 단독 실행 기준 상세 설명. 프론트엔드는 [frontend/README.md](frontend/README.md))
-
-### Windows (PowerShell)
-
-```powershell
-git clone <repo>
-cd navercloud-ai
-powershell -ExecutionPolicy Bypass -File scripts\dev.ps1
-```
-
-### Mac / Linux / WSL
+LLM server:
 
 ```bash
-git clone <repo>
-cd navercloud-ai
-bash scripts/dev.sh
+systemctl status ncloud-llm --no-pager
+systemctl status ollama --no-pager
+journalctl -u ncloud-llm -f
+journalctl -u ollama -f
 ```
 
-스크립트가 자동으로 처리하는 것:
+## API Summary
 
-1. Python 3.10~3.12 탐지
-2. `.venv/` 생성 (없을 때만)
-3. `requirements.txt` 동기화 (해시 변경 시에만 재설치)
-4. `.env` 가 없으면 `.env.example` 복사 후 종료 → 키 채우고 다시 실행
-5. `uvicorn app.main:app --reload --port 8002` 실행
+Base path:
 
-### 옵션
+```text
+/api/v1
+```
 
-| 옵션 | Windows | Unix |
+| Method | Endpoint | Description |
 | --- | --- | --- |
-| 세팅만, 실행 X | `scripts\dev.ps1 -SkipRun` | `bash scripts/dev.sh --skip-run` |
-| venv 재생성 | `scripts\dev.ps1 -Reinstall` | `bash scripts/dev.sh --reinstall` |
-| 포트 변경 | `scripts\dev.ps1 -Port 8001` | `PORT=8001 bash scripts/dev.sh` |
+| `POST` | `/upload` | Create session and start document indexing/question generation in background |
+| `GET` | `/{session_id}/questions/{order}` | Wait for and return a generated question with TTS URL |
+| `GET` | `/audio/questions/{question_id}` | Return generated question TTS audio |
+| `POST` | `/{session_id}/evaluate` | Store audio answer, run STT, and start final evaluation in background when complete |
+| `GET` | `/{session_id}/result` | Wait for and return final evaluation result |
+| `GET` | `/debug/bucket` | Check configured storage mode |
 
-### 수동 실행 (스크립트 없이)
+## Long-running Workflow Handling
 
-```powershell
-.\.venv\Scripts\Activate.ps1
-uvicorn app.main:app --reload --port 8002
+The frontend is currently not changed to use explicit polling APIs, so the backend absorbs long work:
+
+1. `POST /upload` returns quickly with `status=question_processing`.
+2. Question generation and TTS run in a FastAPI background task.
+3. `GET /{session_id}/questions/{order}` waits up to 180 seconds for questions.
+4. `POST /{session_id}/evaluate` returns after answer storage/STT.
+5. If the last answer was submitted, evaluation starts in a background task.
+6. `GET /{session_id}/result` waits up to 300 seconds for the evaluation result.
+
+This keeps the existing frontend flow working without a frontend redeploy.
+The long-term recommended design is explicit status polling from the frontend.
+
+## LLM API Contract
+
+The backend calls the LLM server at `LLM_SERVER_URL`.
+
+Health check:
+
+```http
+GET /health
 ```
 
-### Swagger
+Generate:
 
-http://localhost:8002/docs
-
-### .env 필수 항목
-
-`.env.example` 의 모든 항목 중 다음만 채우면 동작:
-
-- `DATABASE_URL` — Ncloud Postgres + pgvector 접속 URL (`postgresql+psycopg://...`)
-- `LLM_PROVIDER=external` / `LLM_SERVER_URL` — 별도 `ncloud-llm` 서버 URL
-- `CLOVA_VOICE_CLIENT_ID` / `CLOVA_VOICE_CLIENT_SECRET`
-- `CLOVA_SPEECH_API_URL` / `CLOVA_SPEECH_SECRET`
-
-임베딩은 현재 백엔드 내부의 로컬 SentenceTransformer 모델
-`paraphrase-multilingual-MiniLM-L12-v2` 로 처리합니다. 따라서 현재 코드에서는
-`NCLOUD_EMBEDDING_API_URL` / `NCLOUD_EMBEDDING_API_KEY` 값을 사용하지 않습니다.
-
-`OBJECT_STORAGE_*` 는 비워두면 로컬 디스크(`_storage/`)에 저장 — 개발 시 편리.
-
-### 로컬 DB (임시)
-
-클라우드 DB에 접속할 수 없을 때만 사용. Docker 가 필요합니다.
-
-```bash
-docker compose up -d           # PostgreSQL 16 + pgvector 시작
-docker compose ps              # 상태 확인
-docker compose logs -f db      # 로그
-docker compose down            # 중지 (데이터 유지)
-docker compose down -v         # 중지 + 데이터 삭제
+```http
+POST /generate
+Content-Type: application/json
 ```
 
-`.env.example` 의 기본 `DATABASE_URL` 이 이 컨테이너에 맞춰져 있어 별도 수정 불필요 (호스트 포트는 Windows Hyper-V 예약 영역 5358–5457 회피를 위해 **6543** 매핑):
+Request:
 
+```json
+{
+  "prompt": "prompt text",
+  "system": "optional system prompt",
+  "temperature": 0.2,
+  "max_tokens": 1024
+}
 ```
-DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:6543/interview
+
+Response:
+
+```json
+{
+  "text": "model output",
+  "model": "qwen2.5:1.5b",
+  "backend": "ollama"
+}
 ```
 
-클라우드 DB 로 다시 전환할 땐 `.env` 의 `DATABASE_URL` 만 바꾸면 됩니다.
+## Notes
 
-### 마이그레이션
-
-`APP_ENV=local` 일 때 부팅 시 `CREATE EXTENSION vector` 와 테이블이 자동 생성됩니다. 운영 배포 시에는 alembic 등 별도 마이그레이션을 권장.
-
----
-
-## API 요약
-
-| Method | Endpoint | 설명 |
-| --- | --- | --- |
-| `POST` | `/api/v1/upload` | 문서 + 옵션 업로드 → 질문 5개 생성 + TTS |
-| `GET`  | `/api/v1/{session_id}/questions/{order}` | 순서별 질문 + TTS URL |
-| `GET`  | `/api/v1/audio/questions/{question_id}` | 질문 TTS 오디오 (audio/mpeg) |
-| `POST` | `/api/v1/{session_id}/evaluate` | 답변 오디오 업로드 + STT, 5번째면 RAG 평가 |
-| `GET`  | `/api/v1/{session_id}/result` | 평가 결과 조회 |
-
----
-
-## RAG 확장 가이드
-
-### 질문 생성 파이프라인 변경
-- `app/rag/pipelines/question_generation.py` 의 `_build_graph`에서 LangGraph 노드 추가/순서 변경
-- 프롬프트만 바꿀 경우 `app/rag/prompts/question_prompts.py`
-
-### 평가 파이프라인 변경
-- `app/rag/pipelines/answer_evaluation.py` 의 `_evaluate_one` (개별 문항) / `_final_analysis` (총평)
-- 점수 가중치는 `_SCORE_WEIGHTS` 상수
-
-### Ncloud 외 다른 provider로 교체
-- 각 provider는 ABC를 구현하므로 새 클래스 작성 후 `get_*_provider()` factory에서 분기
-- API/services 코드는 변경 없음
-
-### 사전 임베딩 적재
-- `knowledge_documents` / `knowledge_chunks` 테이블에 `source_type ∈ {company_profile, technical_knowledge, personality_question}` 으로 직접 INSERT
-- 별도 admin 스크립트는 추후 추가 (`app/rag/indexing.py` 의 `DocumentIndexer` 와 동일한 패턴 활용 가능)
+- `.env` files contain secrets and must not be committed.
+- `.env.example` and deploy example env files document required keys without real secrets.
+- The current LLM server has limited disk. Use at least 30 GB, preferably 50 GB, before installing `qwen2.5:7b` or `llama3.1:8b`.

@@ -1,93 +1,230 @@
-환경 : Ncloud 인프라 사용. 임베딩은 현재 백엔드 내부 로컬 SentenceTransformer 모델을 사용하고, LLM은 별도 ncloud-llm 서버를 호출한다.
-질문 생성 RAG / 답변 평가 RAG 두개의 파이프라인
+# RAG Pipeline Notes
 
-  0.  기업인재상 문서, 개발 관련 문서, 인성평가 list는 사전에 임베딩됨
+이 문서는 현재 백엔드의 질문 생성 RAG와 답변 평가 RAG 흐름을 설명합니다.
 
-1. AI질문 생성 RAG ( 우리가 공부할거 알고 있는 pdf,docx,txt 및 옵션 선택(어떤 기업(삼성, sk, 네이버), 난이도(쉬움,중간 어려움), 직무 (웹, 앱, AI, 인프라 )를 업로드-> chunk-> 임베딩 -> 질문을 생성할때 Retrieval을 활용해서 문서 검색 (이때 langgraph는 LangGraph는 Retrieval 자체보다 “질문 orchestration” 용도로 사용+ ) -> 생성 (외부 ncloud-llm 서버 사용 )-> 인성 질문 1개 일반적인 개발 상식 1개 내가 올린 문서에서 2개 기업 관련 문제 1개에 대한 질문을 반환
-    - 파이프라인 구조
-    
-    ```
-    PDF Upload
-       ↓
-    Chunking
-       ↓
-    Embedding
-       ↓
-    Vector DB 저장
-       ↓
-    Metadata Filtering
-       ↓
-    Hybrid Retrieval
-       ↓
-    Prompt Augmentation
-       ↓
-    External LLM Question Generation
-    ```
-    
-    Retrieval 전략
-    
-    | 기법 | 목적 |
-    | --- | --- |
-    | Hybrid Search | semantic + keyword 검색 |
-    | Metadata Filtering | 기업/직무 기반 filtering |
-    | Multi Query Retrieval | 다양한 질문 생성 |
-    | Reranking | 검색 정확도 향상 |
-    
-    생성 질문 구성
-    
-    | 질문 유형 | 개수 |
-    | --- | --- |
-    | 인성 질문 | 1 |
-    | 개발 상식 | 1 |
-    | 업로드 문서 기반 | 2 |
-    | 기업 특화 질문 | 1 |
-    
-    LangGraph는 Retrieval 자체보다 “질문 orchestration” 용도로 사용.
-    
-    ```
-    START
-     ├── Personality Question
-     ├── Technical Question
-     ├── Company Question
-     └── PDF-based Question
-    END
-    ```
-    
-    ---
-    
-2. 답변 평가 RAG ( 답변을 text로 받음 → chunking → 임베딩→ retrieval (각 질문에 대한 답변을 제대로 말했는지 각각 평가 (질문에 맞는 답변을 가상으로 생성하고 사용자의 답변과 유사도 평가하여 점수산출 → 5개를 각각 평가하고 점수 합산 → 어떤 방식으로 평가할것인지 RAG 기법을 제안)  → 외부 ncloud-llm 서버로 각각 1.답변 2.잘 대답한점 3.잘못 대답한점 4.개선할 점으로 평가 텍스트 생성 → 점수와 분석 결과 반환
-- Answer Evaluation RAG
-    
-    사용자의 답변을 기술 정확성,논리성,핵심 개념 포함 여부 기준으로 평가하고 피드백 생성.
-    
-- 평가 파이프라인
+## Overview
 
-```
-Question
-   ↓
-Context Retrieval
-   ↓
-Ideal Answer Generation
-   ↓
-User Answer Embedding
-   ↓
-Semantic Comparison
-   ↓
-LLM-based Evaluation
-   ↓
-Score + Feedback 반환
+```text
+Document upload
+  -> text extraction
+  -> chunking
+  -> local embedding
+  -> pgvector storage
+  -> retrieval
+  -> external LLM server
+  -> question generation / answer evaluation
 ```
 
-평가 방식
+Current providers:
 
-단순 cosine similarity 기반 평가 대신:
+| Provider | Implementation |
+| --- | --- |
+| LLM | External `ncloud-llm` server |
+| Embedding | Local SentenceTransformer |
+| TTS | Ncloud Clova Voice |
+| STT | Ncloud Clova Speech |
+| Vector store | PostgreSQL + pgvector |
 
-“모범답안 생성 기반 평가 방식” 적용.
+## Question Generation RAG
 
-평가 흐름
+Purpose:
 
-1. 질문 기반 모범답안 생성
-2. 사용자 답변 임베딩
-3. Semantic Similarity 비교
-4. 핵심 키워드 포함 여부 분석
-5. 외부 LLM 기반 정성 평가
+```text
+Generate five interview questions from uploaded document content and selected options:
+- company
+- difficulty
+- job role
+```
+
+Question composition:
+
+| Type | Count |
+| --- | --- |
+| Personality | 1 |
+| Technical/general development | 1 |
+| Uploaded document based | 2 |
+| Company specific | 1 |
+
+Flow:
+
+```text
+1. User uploads PDF/DOCX/TXT.
+2. Backend extracts text.
+3. Text is split into chunks.
+4. Chunks are embedded with local SentenceTransformer.
+5. Chunks and vectors are stored in pgvector.
+6. Retriever selects relevant uploaded-document and knowledge contexts.
+7. Prompt is sent to the external LLM server.
+8. LLM must return a JSON array of five questions.
+9. Backend validates count and question shape.
+10. Clova Voice creates TTS audio for each question.
+11. Questions and TTS metadata are saved.
+```
+
+Important implementation files:
+
+```text
+app/rag/indexing.py
+app/rag/pipelines/question_generation.py
+app/rag/prompts/question_prompts.py
+app/rag/providers/embedding.py
+app/rag/providers/llm.py
+app/rag/retrieval/
+app/rag/vectorstore/
+```
+
+Current stability measures:
+
+```text
+- Lower question-generation temperature.
+- Prompt requires JSON only.
+- Prompt warns not to include literal line breaks inside JSON string values.
+- LLM JSON parsing tries to extract fenced/raw JSON and repair control characters.
+```
+
+## Answer Evaluation RAG
+
+Purpose:
+
+```text
+Evaluate all saved interview answers and create:
+- question-level score
+- question-level feedback
+- overall score
+- grade
+- strengths
+- weaknesses
+- recommendation
+```
+
+Previous evaluation shape:
+
+```text
+For five questions:
+- ideal answer generation per question
+- per-question LLM scoring
+- final analysis LLM call
+
+Total: about 11 LLM calls
+```
+
+Current evaluation shape:
+
+```text
+For five questions:
+- retrieve compact context per question
+- send all questions and answers to the LLM in one batch
+- parse one JSON response
+
+Total: about 1 LLM call
+```
+
+This reduces latency and keeps the current frontend usable without a polling UI change.
+
+Flow:
+
+```text
+1. User answers each question with audio.
+2. Backend stores audio.
+3. Clova Speech converts audio to answer text.
+4. Backend stores answer text.
+5. After the final answer, backend starts evaluation in a background task.
+6. Evaluation pipeline retrieves compact contexts for each question.
+7. A single batch prompt is sent to the external LLM server.
+8. Backend parses JSON evaluation output.
+9. Evaluation result is saved to interview_evaluations.
+10. Session status changes to evaluated.
+```
+
+Important implementation files:
+
+```text
+app/api/v1/endpoints/evaluate.py
+app/api/v1/endpoints/result.py
+app/services/evaluation_service.py
+app/rag/pipelines/answer_evaluation.py
+app/rag/providers/llm.py
+```
+
+Fallback behavior:
+
+```text
+If batch LLM evaluation fails or returns invalid JSON, the backend creates fallback evaluation data.
+This avoids turning every LLM formatting problem into a 500 response.
+```
+
+## Long-running Request Strategy
+
+The current frontend is not changed. To avoid frontend timeout on long POST requests:
+
+```text
+POST /api/v1/upload
+  -> returns quickly
+  -> question generation runs in background
+
+GET /api/v1/{session_id}/questions/{order}
+  -> waits up to 180 seconds for generated questions
+
+POST /api/v1/{session_id}/evaluate
+  -> stores answer and returns
+  -> final evaluation runs in background after last answer
+
+GET /api/v1/{session_id}/result
+  -> waits up to 300 seconds for evaluation result
+```
+
+Long-term recommended API design:
+
+```text
+POST /upload
+GET /sessions/{session_id}/status
+GET /questions/{order}
+POST /answers
+GET /result
+```
+
+The current implementation keeps compatibility with the existing frontend.
+
+## LLM JSON Contract
+
+Question generation expects a JSON array:
+
+```json
+[
+  {
+    "order": 1,
+    "question_type": "personality",
+    "question": "..."
+  }
+]
+```
+
+Answer evaluation expects a JSON object:
+
+```json
+{
+  "qa_results": [
+    {
+      "order": 1,
+      "question_id": 1,
+      "score": 80,
+      "feedback": "...",
+      "strengths": ["..."],
+      "weaknesses": ["..."],
+      "improvements": ["..."]
+    }
+  ],
+  "analysis": {
+    "summary": "...",
+    "strengths": ["..."],
+    "weaknesses": ["..."],
+    "recommendation": "..."
+  }
+}
+```
+
+## Notes
+
+- Embedding dimension must match the DB vector column dimension. Current local model uses 384 dimensions.
+- Do not switch between 1024-dimensional and 384-dimensional embedding providers without migrating/truncating vector data.
+- Bigger LLM models should improve JSON reliability, but the LLM server needs more disk first.

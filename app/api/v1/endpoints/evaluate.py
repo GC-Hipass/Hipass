@@ -1,15 +1,43 @@
-from fastapi import APIRouter, File, Form, Path, UploadFile
+import logging
+
+from fastapi import APIRouter, BackgroundTasks, File, Form, Path, UploadFile
 from sqlalchemy.orm import Session
 
 from app.api.deps import DBSession
+from app.db.session import SessionLocal
 from app.schemas.answer import AnswerResponse
 from app.services import answer_service, evaluation_service, session_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def _evaluate_session_background(*, session_id: int) -> None:
+    db = SessionLocal()
+    try:
+        session = session_service.get_session(db, session_id)
+        if evaluation_service.get_evaluation_or_none(db, session_id):
+            return
+        session_service.update_status(db, session, "evaluating")
+        evaluation_service.evaluate_session(db, session=session)
+        db.commit()
+    except Exception:  # noqa: BLE001
+        logger.exception("background evaluation failed: session=%s", session_id)
+        db.rollback()
+        try:
+            session = session_service.get_session(db, session_id)
+            session_service.update_status(db, session, "evaluation_failed")
+            db.commit()
+        except Exception:  # noqa: BLE001
+            logger.exception("failed to mark session as evaluation_failed: session=%s", session_id)
+            db.rollback()
+    finally:
+        db.close()
 
 
 @router.post("/{session_id}/evaluate", response_model=AnswerResponse)
 async def submit_answer(
+    background_tasks: BackgroundTasks,
     session_id: int = Path(..., ge=1),
     question_id: int = Form(..., ge=1),
     audio: UploadFile = File(...),
@@ -32,12 +60,13 @@ async def submit_answer(
     answered_count = answer_service.count_answers(db, session.id)
 
     is_session_completed = answered_count >= session.question_count
-    evaluation_payload = None
     if is_session_completed:
-        evaluation = evaluation_service.evaluate_session(db, session=session)
-        evaluation_payload = evaluation_service.to_payload(evaluation)
+        session_service.update_status(db, session, "evaluating")
 
     db.commit()
+
+    if is_session_completed:
+        background_tasks.add_task(_evaluate_session_background, session_id=session.id)
 
     return AnswerResponse(
         answer_id=answer.id,
@@ -49,6 +78,6 @@ async def submit_answer(
         answered_count=answered_count,
         question_count=session.question_count,
         is_session_completed=is_session_completed,
-        is_evaluated=evaluation_payload is not None,
-        evaluation=evaluation_payload,
+        is_evaluated=False,
+        evaluation=None,
     )

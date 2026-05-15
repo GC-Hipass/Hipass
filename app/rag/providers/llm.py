@@ -32,17 +32,91 @@ def parse_json_loose(text: str) -> Any:
     fenced = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
     if fenced:
         text = fenced.group(1).strip()
+
+    candidate = _extract_json_candidate(text)
+    return _json_loads_with_repairs(candidate)
+
+
+def _extract_json_candidate(text: str) -> str:
+    first_obj = text.find("{")
+    first_arr = text.find("[")
+    starts = [i for i in (first_obj, first_arr) if i != -1]
+    if not starts:
+        return text
+
+    start = min(starts)
+    opener = text[start]
+    closer = "}" if opener == "{" else "]"
+    depth = 0
+    in_string = False
+    escaped = False
+
+    for idx in range(start, len(text)):
+        ch = text[idx]
+        if escaped:
+            escaped = False
+            continue
+        if ch == "\\":
+            escaped = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == opener:
+            depth += 1
+        elif ch == closer:
+            depth -= 1
+            if depth == 0:
+                return text[start:idx + 1]
+
+    return text[start:]
+
+
+def _json_loads_with_repairs(text: str) -> Any:
     try:
         return json.loads(text)
-    except json.JSONDecodeError:
-        # 첫 { 또는 [부터 끝까지 시도
-        first_obj = text.find("{")
-        first_arr = text.find("[")
-        candidates = [i for i in (first_obj, first_arr) if i != -1]
-        if not candidates:
-            raise
-        start = min(candidates)
-        return json.loads(text[start:])
+    except json.JSONDecodeError as first_error:
+        repaired = _escape_control_chars_in_strings(text)
+        try:
+            return json.loads(repaired)
+        except json.JSONDecodeError:
+            logger.debug("LLM JSON parse failed. raw=%r repaired=%r", text[:1000], repaired[:1000])
+            raise first_error
+
+
+def _escape_control_chars_in_strings(text: str) -> str:
+    out: list[str] = []
+    in_string = False
+    escaped = False
+
+    for ch in text:
+        if escaped:
+            out.append(ch)
+            escaped = False
+            continue
+        if ch == "\\":
+            out.append(ch)
+            escaped = True
+            continue
+        if ch == '"':
+            out.append(ch)
+            in_string = not in_string
+            continue
+        if in_string and ord(ch) < 0x20:
+            if ch == "\n":
+                out.append("\\n")
+            elif ch == "\r":
+                out.append("\\r")
+            elif ch == "\t":
+                out.append("\\t")
+            else:
+                out.append(f"\\u{ord(ch):04x}")
+            continue
+        out.append(ch)
+
+    return "".join(out)
 
 
 class ExternalLLMProvider(LLMProvider):
