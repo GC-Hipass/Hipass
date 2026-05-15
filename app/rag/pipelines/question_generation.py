@@ -124,7 +124,7 @@ class QuestionGenerationPipeline:
             question_count=state.get("question_count", 5),
         )
         try:
-            raw = self._llm.generate_json(prompt, system=QUESTION_SYSTEM_PROMPT, temperature=0.6)
+            raw = self._llm.generate_json(prompt, system=QUESTION_SYSTEM_PROMPT, temperature=0.2)
         except Exception as e:  # noqa: BLE001
             logger.exception("question generation LLM failed")
             raise LLMEvaluationFailed(f"질문 생성 실패: {e}") from e
