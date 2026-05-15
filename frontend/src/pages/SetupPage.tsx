@@ -5,12 +5,6 @@ import { ApiClientError } from "../api/client";
 import { interviewApi } from "../api/interview";
 import type { Company, Difficulty, JobRole } from "../api/types";
 import { useDeviceCheck } from "../hooks/useDeviceCheck";
-import {
-  DEMO_QUESTION_COUNT,
-  DEMO_RECORDING_SECONDS,
-  DEMO_SEARCH,
-  DEMO_SESSION_ID,
-} from "../mocks/interviewDemo";
 import styles from "./SetupPage.module.css";
 
 const COMPANY_OPTIONS: { value: Company; label: string }[] = [
@@ -65,12 +59,11 @@ export default function SetupPage() {
 
   const canProceed = useMemo(
     () =>
-      Boolean(file) &&
       Boolean(company) &&
       Boolean(difficulty) &&
       Boolean(jobRole) &&
       deviceCheck.micActive,
-    [company, difficulty, deviceCheck.micActive, file, jobRole],
+    [company, difficulty, deviceCheck.micActive, jobRole],
   );
 
   function onPickFile(input: HTMLInputElement) {
@@ -97,10 +90,6 @@ export default function SetupPage() {
   }
 
   async function startInterview() {
-    if (!file) {
-      setErrorMessage("면접에 사용할 PDF 파일을 먼저 첨부해주세요.");
-      return;
-    }
     if (!deviceCheck.micActive) {
       setErrorMessage("면접을 시작하려면 마이크 권한을 허용해주세요.");
       return;
@@ -121,15 +110,19 @@ export default function SetupPage() {
     }
   }
 
+  function previewMockResult() {
+    navigate("/mock/result");
+  }
+
   const inputRef = useRef<HTMLInputElement | null>(null);
   const microphoneWidth = Math.max(6, Math.round(deviceCheck.audioLevel * 100));
   const footerMessage = submitting
     ? "문서를 업로드하고 첫 질문을 준비하고 있어요."
-    : !file
-      ? "면접에 사용할 문서를 PDF로 첨부해주세요."
-      : !deviceCheck.micActive
+    : !deviceCheck.micActive
         ? "시작 전에 마이크 권한을 연결해주세요."
-        : "모든 준비가 끝났어요. 바로 면접을 시작할 수 있습니다.";
+        : file
+          ? "문서와 마이크가 준비됐어요. 바로 면접을 시작할 수 있습니다."
+          : "문서 없이도 시작할 수 있어요. 바로 면접을 진행해보세요.";
 
   return (
     <div className={styles.page}>
@@ -146,22 +139,22 @@ export default function SetupPage() {
       <main className={styles.main}>
         <section className={styles.introPanel}>
           <div className={styles.hero}>
-            <span className={styles.eyebrow}>AI INTERVIEW STUDIO</span>
+            <span className={styles.eyebrow}>AI 모의면접</span>
             <h1 className={styles.heroTitle}>
-              문서와 장치를 연결하고
+              문서가 없어도
               <br />
               바로 면접을 시작하세요
             </h1>
             <p className={styles.heroSub}>
-              PDF 문서를 바탕으로 질문을 만들고, 음성 답변과 함께 바로 피드백을 받아볼 수
-              있습니다.
+              문서를 첨부하면 질문이 더 구체적으로 맞춰지고, 첨부하지 않아도 기본 면접 흐름으로
+              바로 시작할 수 있습니다.
             </p>
           </div>
 
           <div className={styles.heroHighlights}>
             <article className={styles.highlightCard}>
-              <span className={styles.highlightLabel}>문서 기반 질문</span>
-              <strong className={styles.highlightValue}>PDF 업로드</strong>
+              <span className={styles.highlightLabel}>문서 첨부</span>
+              <strong className={styles.highlightValue}>선택 사항</strong>
             </article>
             <article className={styles.highlightCard}>
               <span className={styles.highlightLabel}>답변 타이머</span>
@@ -178,11 +171,11 @@ export default function SetupPage() {
           <div className={styles.primaryPanel}>
             <header className={styles.sectionHeader}>
               <div>
-                <span className={styles.sectionEyebrow}>DOCUMENT SETUP</span>
+                <span className={styles.sectionEyebrow}>면접 설정</span>
                 <h2 className={styles.sectionTitle}>면접 정보 설정</h2>
               </div>
               <p className={styles.sectionDescription}>
-                서류와 직무 정보를 바탕으로 질문과 평가 기준을 맞춤 설정합니다.
+                기업, 난이도, 직무를 고르면 바로 면접을 시작할 수 있습니다.
               </p>
             </header>
 
@@ -208,12 +201,14 @@ export default function SetupPage() {
                 <>
                   <div className={styles.dropIcon} aria-hidden>⬆</div>
                   <div className={styles.dropBody}>
-                    <div className={styles.dropTitle}>면접에 사용할 PDF를 첨부해주세요</div>
+                    <div className={styles.dropTitle}>문서가 있다면 함께 첨부해주세요</div>
                     <div className={styles.dropSub}>
-                      이력서, 경력기술서, 포트폴리오 PDF를 올릴 수 있습니다.
+                      이력서, 경력기술서, 포트폴리오를 올리면 질문이 더 구체적으로 맞춰집니다.
                     </div>
                   </div>
-                  <div className={styles.dropMeta}>PDF · DOCX · TXT · 최대 {MAX_FILE_MB}MB</div>
+                  <div className={styles.dropMeta}>
+                    PDF · DOCX · TXT · 최대 {MAX_FILE_MB}MB · 첨부 선택
+                  </div>
                   <button className={styles.btnPrimaryGhost} type="button">
                     파일 선택
                   </button>
@@ -267,7 +262,7 @@ export default function SetupPage() {
             <section className={styles.deviceCard}>
               <header className={styles.sectionHeader}>
                 <div>
-                  <span className={styles.sectionEyebrow}>DEVICE CHECK</span>
+                  <span className={styles.sectionEyebrow}>장치 확인</span>
                   <h2 className={styles.sectionTitle}>장치 상태 확인</h2>
                 </div>
                 <button
@@ -280,7 +275,7 @@ export default function SetupPage() {
               </header>
 
               <p className={styles.sectionDescription}>
-                마이크는 필수입니다. 카메라가 연결되면 프리뷰로 바로 상태를 확인할 수 있어요.
+                마이크는 필수입니다. 카메라는 선택 사항이며 연결되면 바로 프리뷰를 볼 수 있어요.
               </p>
 
               <div className={styles.videoFrame}>
@@ -295,7 +290,7 @@ export default function SetupPage() {
                 ) : (
                   <>
                     <div className={styles.videoGlow} aria-hidden />
-                    <div className={styles.videoEmpty}>CAM PREVIEW</div>
+                    <div className={styles.videoEmpty}>카메라 대기</div>
                     <p className={styles.videoHint}>
                       카메라가 연결되면 이 영역에서 프리뷰를 볼 수 있습니다.
                     </p>
@@ -329,7 +324,7 @@ export default function SetupPage() {
             <section className={styles.readinessCard}>
               <header className={styles.sectionHeader}>
                 <div>
-                  <span className={styles.sectionEyebrow}>READY CHECK</span>
+                  <span className={styles.sectionEyebrow}>시작 전 확인</span>
                   <h2 className={styles.sectionTitle}>시작 전 요약</h2>
                 </div>
               </header>
@@ -339,7 +334,7 @@ export default function SetupPage() {
                   <div className={styles.readinessItemMeta}>
                     <span className={styles.readinessLabel}>문서</span>
                     <strong className={styles.readinessValue}>
-                      {file ? file.name : "첨부 전"}
+                      {file ? file.name : "첨부 없이 기본 질문으로 진행"}
                     </strong>
                   </div>
                 </div>
@@ -373,27 +368,14 @@ export default function SetupPage() {
 
         <footer className={styles.footer}>
           <div className={styles.footerCopy}>
-            <span className={styles.footerLabel}>Status</span>
+            <span className={styles.footerLabel}>상태</span>
             <p className={styles.footerText}>{footerMessage}</p>
           </div>
 
           <div className={styles.footerActions}>
-            {import.meta.env.DEV && (
-              <button
-                className={styles.btnSecondary}
-                type="button"
-                onClick={() =>
-                  navigate(`/interview/${DEMO_SESSION_ID}/1${DEMO_SEARCH}`, {
-                    state: {
-                      questionCount: DEMO_QUESTION_COUNT,
-                      recordingSeconds: DEMO_RECORDING_SECONDS,
-                    },
-                  })
-                }
-              >
-                데모 화면
-              </button>
-            )}
+            <button className={styles.btnSecondary} type="button" onClick={previewMockResult}>
+              결과 화면 미리보기
+            </button>
             <button
               className={styles.btnPrimary}
               type="button"

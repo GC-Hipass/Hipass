@@ -5,6 +5,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--sp-4);
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .item {
@@ -13,10 +16,10 @@
   backdrop-filter: blur(18px);
   border: 1px solid rgba(191, 203, 255, 0.78);
   border-radius: var(--radius-lg);
-  padding: var(--sp-5);
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
+  gap: 10px;
   box-shadow: var(--shadow-sm);
 }
 
@@ -40,6 +43,8 @@
 }
 
 .itemMeta {
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
@@ -83,21 +88,23 @@
 
 .question {
   font-weight: 600;
-  font-size: 15px;
+  font-size: 14px;
   color: var(--text);
-  line-height: 1.55;
+  line-height: 1.45;
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .answer {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text-muted);
-  line-height: 1.6;
+  line-height: 1.5;
   background: rgba(248, 250, 255, 0.95);
   border: 1px solid rgba(214, 223, 255, 0.9);
   border-radius: var(--radius-md);
   padding: var(--sp-3) var(--sp-4);
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .aLabel {
@@ -110,14 +117,15 @@
 }
 
 .feedback {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text);
   background: linear-gradient(135deg, rgba(34, 64, 255, 0.08), rgba(101, 217, 255, 0.08));
   border: 1px solid rgba(191, 203, 255, 0.8);
   padding: var(--sp-3) var(--sp-4);
   border-radius: var(--radius-md);
   margin: 0;
-  line-height: 1.55;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .scoreHint {

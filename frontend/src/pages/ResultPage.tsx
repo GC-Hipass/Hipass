@@ -95,7 +95,7 @@ export default function ResultPage() {
         <div className={styles.heroBg} aria-hidden />
         <div className={styles.heroContent}>
           <div className={styles.heroCopy}>
-            <span className={styles.heroLabel}>INTERVIEW REPORT</span>
+            <span className={styles.heroLabel}>면접 결과</span>
             <h1 className={styles.heroTitle}>{analysis.summary || "면접을 완료하셨습니다."}</h1>
             <p className={styles.heroSub}>
               총 {qa_list.length}개 문항을 분석해 답변 패턴과 다음 면접에서 살릴 포인트를
@@ -150,7 +150,7 @@ export default function ResultPage() {
 
           <section className={styles.tipBox}>
             <div className={styles.tipHeader}>
-              <span className={styles.tipBadge}>NEXT STEP</span>
+              <span className={styles.tipBadge}>다음 준비</span>
               <h2 className={styles.tipTitle}>다음 면접에서 바로 써먹을 포인트</h2>
             </div>
             <p className={styles.tipText}>
@@ -162,7 +162,7 @@ export default function ResultPage() {
         <section className={styles.qaPanel}>
           <header className={styles.qaHeader}>
             <div>
-              <span className={styles.qaEyebrow}>QUESTION REVIEW</span>
+              <span className={styles.qaEyebrow}>문항 리뷰</span>
               <h2 className={styles.qaTitle}>문항별 결과</h2>
             </div>
             <span className={styles.qaCount}>{qa_list.length}개 답변 분석 완료</span>

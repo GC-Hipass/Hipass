@@ -1,6 +1,6 @@
 .page {
   position: relative;
-  min-height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -18,27 +18,28 @@
   pointer-events: none;
 }
 
+/* ── 상단 바 ── */
 .topBar {
   position: relative;
   z-index: 1;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--sp-5) var(--sp-6);
+  padding: 12px 24px;
 }
 
 .sessionMeta {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  align-items: center;
+  gap: 10px;
 }
 
 .badge {
-  align-self: flex-start;
   background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.88);
-  padding: 7px 12px;
-  border-radius: var(--radius-pill);
+  padding: 5px 10px;
+  border-radius: 999px;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.14em;
@@ -53,62 +54,67 @@
 .timerWrap {
   display: flex;
   align-items: center;
-  gap: var(--sp-2);
-  padding: 10px 16px;
-  border-radius: var(--radius-pill);
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
   font-variant-numeric: tabular-nums;
   font-weight: 800;
   font-size: 15px;
-  color: var(--text-inverse);
+  color: #fff;
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(12px);
 }
 
 .timerIcon {
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .timerText {
   letter-spacing: 0.04em;
 }
 
+/* ── 메인 (flex: 1 — topBar / bottomPanel 사이 공간 모두 점유) ── */
 .main {
   position: relative;
   z-index: 1;
   flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   max-width: 1180px;
   width: 100%;
   margin: 0 auto;
-  padding: 0 var(--sp-6) var(--sp-8);
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-5);
+  padding: 0 24px 12px;
+  overflow: hidden;
 }
 
+/* ── 질문 박스 ── */
 .questionBox {
-  padding: var(--sp-6);
-  border-radius: var(--radius-xl);
+  flex-shrink: 0;
+  padding: 16px 20px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(14px);
-  box-shadow: 0 22px 52px rgba(3, 8, 24, 0.26);
+  box-shadow: 0 16px 40px rgba(3, 8, 24, 0.26);
 }
 
 .questionMeta {
   display: flex;
   align-items: center;
-  gap: var(--sp-4);
-  margin-bottom: var(--sp-4);
+  gap: 12px;
+  margin-bottom: 10px;
 }
 
 .phasePill {
   flex-shrink: 0;
-  padding: 8px 12px;
-  border-radius: var(--radius-pill);
+  padding: 5px 10px;
+  border-radius: 999px;
   background: rgba(101, 217, 255, 0.12);
   color: #d8f7ff;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -116,7 +122,7 @@
 
 .progressBar {
   flex: 1;
-  height: 10px;
+  height: 8px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
   overflow: hidden;
@@ -131,8 +137,8 @@
 
 .questionLead {
   display: block;
-  margin-bottom: var(--sp-3);
-  font-size: 12px;
+  margin-bottom: 6px;
+  font-size: 11px;
   font-weight: 800;
   color: rgba(255, 255, 255, 0.58);
   letter-spacing: 0.16em;
@@ -141,58 +147,61 @@
 
 .questionText {
   margin: 0;
-  font-size: clamp(24px, 3vw, 34px);
+  font-size: clamp(18px, 2.2vw, 26px);
   font-weight: 700;
   line-height: 1.4;
   color: #f7f9ff;
 }
 
 .questionSub {
-  margin: var(--sp-4) 0 0;
-  max-width: 700px;
-  font-size: 15px;
-  line-height: 1.7;
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
   color: rgba(255, 255, 255, 0.68);
 }
 
 .loadingText {
   color: rgba(255, 255, 255, 0.68);
-  font-size: 15px;
+  font-size: 14px;
 }
 
+/* ── 스테이지 (남은 세로 공간 모두 점유) ── */
 .stage {
   flex: 1;
+  min-height: 0;
   display: flex;
-  align-items: center;
+  flex-direction: column;
 }
 
 .stageGrid {
-  width: 100%;
+  flex: 1;
+  min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
-  gap: var(--sp-5);
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  gap: 12px;
   align-items: stretch;
 }
 
+/* ── 아바타 영역 ── */
 .avatarWrap {
-  min-height: 440px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--sp-4);
-  border-radius: var(--radius-xl);
+  gap: 12px;
+  border-radius: 16px;
   background:
     radial-gradient(circle at center, rgba(34, 64, 255, 0.18), transparent 46%),
     rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(12px);
+  overflow: hidden;
 }
 
 .avatarShell {
   position: relative;
-  width: 320px;
-  height: 320px;
+  width: min(220px, 28vw);
+  height: min(220px, 28vw);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -203,19 +212,19 @@
   inset: 12%;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(101, 217, 255, 0.3), transparent 68%);
-  filter: blur(18px);
+  filter: blur(14px);
 }
 
 .avatar {
   position: relative;
-  width: 240px;
-  height: 240px;
+  width: 75%;
+  height: 75%;
   border-radius: 50%;
   background: linear-gradient(135deg, #98b6ff 0%, #4964ff 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 30px 60px rgba(15, 29, 88, 0.3);
+  box-shadow: 0 20px 50px rgba(15, 29, 88, 0.3);
   transition: transform 0.4s ease;
 }
 
@@ -231,30 +240,30 @@
   }
   50% {
     transform: scale(1.03);
-    box-shadow: 0 0 0 28px rgba(79, 127, 255, 0);
+    box-shadow: 0 0 0 20px rgba(79, 127, 255, 0);
   }
 }
 
 .avatarFace {
-  width: 60%;
-  height: 60%;
+  width: 58%;
+  height: 58%;
   background: rgba(255, 255, 255, 0.96);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 18px;
+  gap: 14px;
 }
 
 .avatarEye {
-  width: 14px;
-  height: 14px;
+  width: 11px;
+  height: 11px;
   background: #0d1638;
   border-radius: 50%;
 }
 
 .avatarLabel {
-  font-size: 14px;
+  font-size: 13px;
   color: rgba(255, 255, 255, 0.72);
   font-weight: 700;
 }
@@ -262,31 +271,33 @@
 .speakingBadge {
   background: rgba(101, 217, 255, 0.12);
   color: #dffaff;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  padding: 7px 12px;
-  border-radius: var(--radius-pill);
+  padding: 5px 10px;
+  border-radius: 999px;
 }
 
+/* ── 사이드 패널 ── */
 .sidePanel {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-4);
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .infoCard {
-  padding: var(--sp-6);
-  border-radius: var(--radius-xl);
+  padding: 16px 18px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(14px);
-  box-shadow: 0 22px 52px rgba(3, 8, 24, 0.18);
 }
 
 .infoEyebrow {
   display: block;
-  margin-bottom: var(--sp-2);
-  font-size: 11px;
+  margin-bottom: 4px;
+  font-size: 10px;
   font-weight: 800;
   color: rgba(255, 255, 255, 0.56);
   letter-spacing: 0.16em;
@@ -294,8 +305,8 @@
 }
 
 .infoTitle {
-  margin: 0 0 var(--sp-4);
-  font-size: 22px;
+  margin: 0 0 12px;
+  font-size: 18px;
   color: #f7f9ff;
   font-weight: 800;
   letter-spacing: -0.02em;
@@ -304,23 +315,23 @@
 .flowList {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
+  gap: 6px;
 }
 
 .flowItem {
-  padding: var(--sp-4) var(--sp-5);
-  border-radius: 18px;
+  padding: 10px 14px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.62);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
 }
 
 .flowItemActive {
   background: linear-gradient(135deg, rgba(101, 217, 255, 0.18), rgba(62, 84, 255, 0.22));
   border-color: rgba(101, 217, 255, 0.36);
-  color: var(--text-inverse);
+  color: #fff;
 }
 
 .flowItemDone {
@@ -330,21 +341,21 @@
 .statGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--sp-3);
+  gap: 8px;
 }
 
 .statCard {
-  padding: var(--sp-4);
-  border-radius: 18px;
+  padding: 12px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: 4px;
 }
 
 .statLabel {
-  font-size: 12px;
+  font-size: 11px;
   color: rgba(255, 255, 255, 0.56);
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -352,18 +363,18 @@
 }
 
 .statValue {
-  font-size: 18px;
-  color: var(--text-inverse);
+  font-size: 15px;
+  color: #fff;
   font-weight: 800;
 }
 
 .demoNote,
 .errorCard {
-  margin-top: var(--sp-4);
-  padding: var(--sp-4);
-  border-radius: var(--radius-md);
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
   line-height: 1.6;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .demoNote {
@@ -377,13 +388,15 @@
   color: #ffd8d8;
 }
 
+/* ── 하단 패널 ── */
 .bottomPanel {
   position: relative;
   z-index: 1;
-  padding: var(--sp-6);
+  flex-shrink: 0;
+  padding: 10px 24px 12px;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-4);
+  gap: 8px;
   background: rgba(3, 8, 24, 0.72);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(14px);
@@ -393,44 +406,45 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--sp-4);
+  gap: 12px;
   max-width: 1180px;
   width: 100%;
   margin: 0 auto;
 }
 
 .statusHint {
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: 13px;
+  line-height: 1.5;
   color: rgba(255, 255, 255, 0.7);
 }
 
 .actionButtons {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
+  gap: 8px;
 }
 
 .secondaryBtn,
 .completeBtn {
   border: none;
-  padding: 14px 22px;
-  border-radius: 16px;
+  padding: 11px 18px;
+  border-radius: 12px;
   font-weight: 800;
-  font-size: 15px;
+  font-size: 14px;
+  cursor: pointer;
 }
 
 .secondaryBtn {
-  color: var(--text-inverse);
+  color: #fff;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .completeBtn {
-  min-width: 170px;
+  min-width: 140px;
   color: #071033;
   background: linear-gradient(135deg, #6fe8ff 0%, #7cc2ff 50%, #c9d4ff 100%);
-  box-shadow: 0 18px 36px rgba(101, 217, 255, 0.2);
+  box-shadow: 0 14px 28px rgba(101, 217, 255, 0.2);
 }
 
 .completeBtn:disabled {
@@ -444,17 +458,24 @@
   display: none;
 }
 
-@media (max-width: 980px) {
+/* ── 반응형 ── */
+@media (max-width: 900px) {
   .stageGrid {
     grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+
+  .avatarShell {
+    width: 160px;
+    height: 160px;
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 600px) {
   .topBar,
   .main,
   .bottomPanel {
-    padding-inline: var(--sp-4);
+    padding-inline: 14px;
   }
 
   .questionMeta,
@@ -466,15 +487,5 @@
 
   .statGrid {
     grid-template-columns: 1fr;
-  }
-
-  .avatarShell {
-    width: 250px;
-    height: 250px;
-  }
-
-  .avatar {
-    width: 200px;
-    height: 200px;
   }
 }

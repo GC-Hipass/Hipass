@@ -25,14 +25,22 @@ async function parseError(res: Response): Promise<never> {
   throw new ApiClientError(res.status, body);
 }
 
+async function request(path: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(`${BASE_URL}${path}`, init);
+  } catch {
+    throw new Error("백엔드 서버에 연결할 수 없습니다. 서버 실행 상태와 API 주소를 확인해주세요.");
+  }
+}
+
 export async function getJson<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, { method: "GET" });
+  const res = await request(path, { method: "GET" });
   if (!res.ok) await parseError(res);
   return res.json() as Promise<T>;
 }
 
 export async function postForm<T>(path: string, form: FormData): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await request(path, {
     method: "POST",
     body: form,
   });
