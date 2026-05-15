@@ -46,8 +46,10 @@ class Settings(BaseSettings):
     clova_speech_language: str = "ko-KR"
 
     # Embedding
-    # ncloud: calls the Ncloud Embedding API. mock: offline test mode.
-    embedding_provider: Literal["ncloud", "mock"] = "ncloud"
+    # local: SentenceTransformer runs inside this FastAPI app.
+    # ncloud is kept as a legacy alias for local; Ncloud Embedding API is not wired yet.
+    # mock: deterministic offline vectors for smoke tests.
+    embedding_provider: Literal["local", "ncloud", "mock"] = "local"
     ncloud_embedding_api_url: str = ""
     ncloud_embedding_api_key: str = ""
     ncloud_embedding_model: str = "bge-m3"

@@ -20,10 +20,13 @@ APP_ENV=prod
 DATABASE_URL=postgresql+psycopg://hpuser:<URL_ENCODED_DB_PASSWORD>@10.0.3.7:5432/hpdb
 LLM_PROVIDER=external
 LLM_SERVER_URL=http://10.0.4.6:8000
+EMBEDDING_PROVIDER=local
 EMBEDDING_DIMENSION=384
 ```
 
 Use `STT_PROVIDER=mock` only for smoke tests. Use `STT_PROVIDER=clova` for real speech-to-text.
+Embeddings are generated on the app server by the local SentenceTransformer model
+`paraphrase-multilingual-MiniLM-L12-v2`; the Ncloud Embedding API env values are not used by the current code.
 
 ## Smoke checks
 

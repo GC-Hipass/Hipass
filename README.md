@@ -20,7 +20,7 @@ app/
 └── rag/                # RAG 모듈 (API와 독립)
     ├── parser/         # PDF/DOCX/TXT 텍스트 추출
     ├── chunker/        # 텍스트 분할
-    ├── embedding (providers/embedding)  # Ncloud Embedding
+    ├── embedding (providers/embedding)  # Local SentenceTransformer Embedding
     ├── vectorstore/    # pgvector
     ├── retrieval/      # Hybrid + Rerank
     ├── prompts/        # 질문 생성 / 답변 평가 프롬프트
@@ -33,7 +33,7 @@ app/
 - `api` → `services` 만 호출 (RAG 직접 호출 금지)
 - `services` → `rag.pipelines` / `rag.indexing` / `rag.providers` / `db.models`
 - `rag/*` 는 외부 모듈을 import하지 않음 (단, `db.models`만 사용 — pgvector 컬럼 정의 공유 목적)
-- 외부 SaaS(Ncloud)는 모두 `rag/providers/` 의 추상 클래스 뒤에 숨김 → 구현체 교체 시 `factory`만 수정
+- 외부 연동(LLM 서버, Clova STT/TTS, Object Storage)은 모두 `rag/providers/` 의 추상 클래스 뒤에 숨김 → 구현체 교체 시 `factory`만 수정
 
 ---
 
@@ -121,9 +121,13 @@ http://localhost:8002/docs
 `.env.example` 의 모든 항목 중 다음만 채우면 동작:
 
 - `DATABASE_URL` — Ncloud Postgres + pgvector 접속 URL (`postgresql+psycopg://...`)
+- `LLM_PROVIDER=external` / `LLM_SERVER_URL` — 별도 `ncloud-llm` 서버 URL
 - `CLOVA_VOICE_CLIENT_ID` / `CLOVA_VOICE_CLIENT_SECRET`
 - `CLOVA_SPEECH_API_URL` / `CLOVA_SPEECH_SECRET`
-- `NCLOUD_EMBEDDING_API_URL` / `NCLOUD_EMBEDDING_API_KEY`
+
+임베딩은 현재 백엔드 내부의 로컬 SentenceTransformer 모델
+`paraphrase-multilingual-MiniLM-L12-v2` 로 처리합니다. 따라서 현재 코드에서는
+`NCLOUD_EMBEDDING_API_URL` / `NCLOUD_EMBEDDING_API_KEY` 값을 사용하지 않습니다.
 
 `OBJECT_STORAGE_*` 는 비워두면 로컬 디스크(`_storage/`)에 저장 — 개발 시 편리.
 
