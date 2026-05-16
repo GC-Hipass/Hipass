@@ -1,4 +1,3 @@
-```md
 # Hipass AI Interview Backend
 
 문서 기반 RAG 면접 질문 생성 및 답변 평가 서비스입니다.
@@ -8,7 +7,6 @@ LLM 추론은 백엔드 서버에서 직접 실행하지 않고, 별도 `ncloud-
 
 ## 아키텍처
 
-```text
 Frontend (Vercel)
   -> Nginx 웹 서버: 101.79.17.102
   -> FastAPI 앱 서버: 10.0.2.6:8000
@@ -17,7 +15,6 @@ Frontend (Vercel)
 
 FastAPI 앱 서버
   -> PostgreSQL + pgvector: 10.0.3.7:5432
-```
 
 ## 주요 기술 구성
 
