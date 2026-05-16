@@ -19,3 +19,10 @@ _logs/
 .DS_Store
 Thumbs.db
 init.sql
+
+# 미사용 원본 문서 (인덱싱 제외)
+docs/- naver 3D Vision Research Engineer.txt
+docs/- naver N플리마켓 프로덕트 디자인 (경력).txt
+docs/- samsung [DS부문] Samsung Convergenc.txt
+docs/- sk SKT 및 ICT Family사 시스템 담당자 영입.txt
+docs/- naver sk samsung 인재상.txt

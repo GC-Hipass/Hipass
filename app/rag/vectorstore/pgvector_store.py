@@ -52,6 +52,36 @@ class PgVectorStore:
             )
         self._db.flush()
 
+    def insert_knowledge_chunks(
+        self,
+        *,
+        knowledge_document_id: int,
+        source_type: str,
+        company: str | None,
+        job_role: str | None,
+        difficulty: str | None,
+        contents: list[str],
+        embeddings: list[list[float]],
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        if len(contents) != len(embeddings):
+            raise ValueError("contents and embeddings length mismatch")
+        for idx, (content, vec) in enumerate(zip(contents, embeddings, strict=True)):
+            self._db.add(
+                KnowledgeChunk(
+                    knowledge_document_id=knowledge_document_id,
+                    source_type=source_type,
+                    company=company,
+                    job_role=job_role,
+                    difficulty=difficulty,
+                    chunk_index=idx,
+                    content=content,
+                    embedding=vec,
+                    chunk_metadata=metadata or {},
+                )
+            )
+        self._db.flush()
+
     def search_uploaded(
         self,
         *,

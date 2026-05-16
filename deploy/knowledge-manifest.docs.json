@@ -1,0 +1,59 @@
+[
+  {
+    "source_type": "personality_question",
+    "title": "인성면접 질문 Top20",
+    "path": "../docs/인성면접_질문Top20.txt",
+    "metadata": { "seed_group": "docs" }
+  },
+
+  {
+    "source_type": "company_profile",
+    "company": "naver",
+    "title": "NAVER 인재상 및 핵심 가치",
+    "path": "../docs/naver_인재상.txt",
+    "metadata": { "seed_group": "docs" }
+  },
+  {
+    "source_type": "company_profile",
+    "company": "samsung",
+    "title": "삼성 인재상 및 핵심 가치",
+    "path": "../docs/samsung_인재상.txt",
+    "metadata": { "seed_group": "docs" }
+  },
+  {
+    "source_type": "company_profile",
+    "company": "sk",
+    "title": "SK 인재상 및 핵심 가치",
+    "path": "../docs/sk_인재상.txt",
+    "metadata": { "seed_group": "docs" }
+  },
+
+  {
+    "source_type": "technical_knowledge",
+    "job_role": "ai",
+    "title": "AI 직무 면접 기술 지식",
+    "path": "../docs/ai_interview_prep.txt",
+    "metadata": { "seed_group": "docs" }
+  },
+  {
+    "source_type": "technical_knowledge",
+    "job_role": "app",
+    "title": "백엔드/앱 직무 면접 기술 지식",
+    "path": "../docs/backend_interview_prep.txt",
+    "metadata": { "seed_group": "docs" }
+  },
+  {
+    "source_type": "technical_knowledge",
+    "job_role": "web",
+    "title": "프론트엔드/웹 직무 면접 기술 지식",
+    "path": "../docs/frontend_interview_prep (1).txt",
+    "metadata": { "seed_group": "docs" }
+  },
+  {
+    "source_type": "technical_knowledge",
+    "job_role": "devops",
+    "title": "인프라/DevOps 직무 면접 기술 지식",
+    "path": "../docs/infra_interview_prep.txt",
+    "metadata": { "seed_group": "docs" }
+  }
+]

@@ -18,6 +18,37 @@ class ObjectStorage(ABC):
     def get(self, key: str) -> bytes: ...
 
 
+class FallbackObjectStorage(ObjectStorage):
+    """로컬 개발 시 원격 스토리지 실패를 로컬 디스크로 폴백한다."""
+
+    def __init__(self, primary: ObjectStorage, fallback: ObjectStorage, *, label: str):
+        self._primary = primary
+        self._fallback = fallback
+        self._label = label
+
+    def put(self, key: str, data: bytes, *, content_type: str | None = None) -> str:
+        try:
+            return self._primary.put(key, data, content_type=content_type)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(
+                "%s object storage put failed; falling back to local storage: %s",
+                self._label,
+                e,
+            )
+            return self._fallback.put(key, data, content_type=content_type)
+
+    def get(self, key: str) -> bytes:
+        try:
+            return self._primary.get(key)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(
+                "%s object storage get failed; falling back to local storage: %s",
+                self._label,
+                e,
+            )
+            return self._fallback.get(key)
+
+
 class LocalObjectStorage(ObjectStorage):
     """개발용. local_dir/<key>로 저장."""
 
@@ -119,27 +150,35 @@ class NcloudObjectStorage(ObjectStorage):
 def get_voice_storage() -> ObjectStorage:
     """음성 파일(TTS 질문, 답변 녹음) 전용 스토리지."""
     s = get_settings()
+    local = LocalObjectStorage(s.local_storage_dir_voice)
     if s.use_voice_storage:
-        return NcloudObjectStorage(
+        remote = NcloudObjectStorage(
             endpoint=s.object_storage_endpoint,
             region=s.object_storage_region,
             bucket=s.object_storage_bucket_voice,
             access_key=s.object_storage_access_key_voice,
             secret_key=s.object_storage_secret_key_voice,
         )
-    return LocalObjectStorage(s.local_storage_dir_voice)
+        if s.app_env == "local":
+            return FallbackObjectStorage(remote, local, label="voice")
+        return remote
+    return local
 
 
 @lru_cache(maxsize=1)
 def get_document_storage() -> ObjectStorage:
     """업로드 문서 전용 스토리지."""
     s = get_settings()
+    local = LocalObjectStorage(s.local_storage_dir_document)
     if s.use_document_storage:
-        return NcloudObjectStorage(
+        remote = NcloudObjectStorage(
             endpoint=s.object_storage_endpoint,
             region=s.object_storage_region,
             bucket=s.object_storage_bucket_document,
             access_key=s.object_storage_access_key_document,
             secret_key=s.object_storage_secret_key_document,
         )
-    return LocalObjectStorage(s.local_storage_dir_document)
+        if s.app_env == "local":
+            return FallbackObjectStorage(remote, local, label="document")
+        return remote
+    return local
