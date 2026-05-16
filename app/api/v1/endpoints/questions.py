@@ -1,11 +1,17 @@
+import time
+
 from fastapi import APIRouter, Path
 from sqlalchemy.orm import Session
 
 from app.api.deps import DBSession
+from app.core.exceptions import QuestionNotFound
 from app.schemas.question import QuestionResponse
 from app.services import question_service, session_service
 
 router = APIRouter()
+
+QUESTION_WAIT_TIMEOUT_SECONDS = 180
+QUESTION_WAIT_INTERVAL_SECONDS = 1
 
 
 @router.get("/{session_id}/questions/{order}", response_model=QuestionResponse)
@@ -14,8 +20,21 @@ def get_question(
     order: int = Path(..., ge=1, le=10),
     db: Session = DBSession,
 ) -> QuestionResponse:
-    session = session_service.get_session(db, session_id)
-    question = question_service.get_question_by_order(db, session_id=session_id, order=order)
+    deadline = time.monotonic() + QUESTION_WAIT_TIMEOUT_SECONDS
+
+    while True:
+        db.expire_all()
+        session = session_service.get_session(db, session_id)
+        try:
+            question = question_service.get_question_by_order(db, session_id=session_id, order=order)
+            break
+        except QuestionNotFound:
+            if session.status == "question_generation_failed":
+                raise
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(QUESTION_WAIT_INTERVAL_SECONDS)
+
     return QuestionResponse(
         session_id=session.id,
         question_id=question.id,
