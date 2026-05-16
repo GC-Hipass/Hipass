@@ -51,13 +51,13 @@ STT_PROVIDER=clova
 ```powershell
 cd C:\Users\ksyzi\PycharmProjects\ncloud\navercloud-ai
 
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8002
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
 ```
 
 Swagger:
 
 ```text
-http://127.0.0.1:8002/docs
+http://127.0.0.1:8000/docs
 ```
 
 프론트엔드 로컬 개발 환경은 일반적으로 백엔드 `8002` 포트로 프록시합니다.
