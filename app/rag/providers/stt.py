@@ -25,6 +25,10 @@ class STTProvider(ABC):
     def transcribe(self, audio_bytes: bytes, *, content_type: str) -> str: ...
 
 
+def _is_effectively_empty_transcript(text: str) -> bool:
+    return not text.strip()
+
+
 class ClovaSpeechProvider(STTProvider):
     """Ncloud Clova Speech providers.
 
@@ -95,12 +99,12 @@ class ClovaSpeechProvider(STTProvider):
             resp.raise_for_status()
             data = resp.json()
             text = self._extract_text(data)
-            if not text:
+            if _is_effectively_empty_transcript(text):
                 logger.warning(
                     "clova speech upload returned empty transcript: %s",
                     self._summarize_response(data),
                 )
-                raise STTFailed("Unexpected empty STT response.")
+                return ""
             return text
         except httpx.HTTPError as e:
             logger.exception("clova speech upload stt failed")
@@ -127,12 +131,12 @@ class ClovaSpeechProvider(STTProvider):
             resp.raise_for_status()
             data = resp.json()
             text = self._extract_text(data)
-            if not text:
+            if _is_effectively_empty_transcript(text):
                 logger.warning(
                     "clova speech csr returned empty transcript: %s",
                     self._summarize_response(data),
                 )
-                raise STTFailed("Unexpected empty STT response.")
+                return ""
             return text
         except httpx.HTTPError as e:
             logger.exception("clova speech csr failed")

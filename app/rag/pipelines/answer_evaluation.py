@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import LLMEvaluationFailed
-from app.rag.providers import LLMProvider, get_llm_provider
-from app.rag.retrieval import HybridRetriever
+from app.rag.providers.llm import LLMProvider, get_llm_provider
+
+if TYPE_CHECKING:
+    from app.rag.retrieval.hybrid_retriever import HybridRetriever
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +81,10 @@ def _string_list(value: Any) -> list[str]:
     return []
 
 
+def _is_blank_answer(answer: str) -> bool:
+    return not (answer or "").strip()
+
+
 def _compact_contexts(chunks: list[Any], *, limit: int = 1, max_chars: int = 450) -> str:
     parts: list[str] = []
     for idx, chunk in enumerate(chunks[:limit], 1):
@@ -147,6 +153,18 @@ JSON shape:
 
 def _fallback_question_evaluation(qa: QuestionAnswer) -> QuestionEvaluation:
     answer = (qa.answer or "").strip()
+    if not answer:
+        return QuestionEvaluation(
+            order=qa.order,
+            question_id=qa.question_id,
+            question=qa.question,
+            answer=qa.answer,
+            score=0,
+            feedback="답변이 제출되지 않아 평가할 내용이 없습니다.",
+            strengths=[],
+            weaknesses=["무응답으로 인해 역량을 판단할 근거가 부족합니다."],
+            improvements=["짧게라도 핵심 경험, 이유, 결과를 포함해 답변을 남겨보세요."],
+        )
     length_score = min(35, len(answer) // 8)
     structure_bonus = 10 if any(token in answer.lower() for token in ("result", "problem", "solution")) else 0
     score = max(45, min(78, 45 + length_score + structure_bonus))
@@ -172,7 +190,11 @@ class AnswerEvaluationPipeline:
         llm: LLMProvider | None = None,
     ):
         self._db = db
-        self._retriever = retriever or HybridRetriever(db)
+        if retriever is None:
+            from app.rag.retrieval.hybrid_retriever import HybridRetriever
+
+            retriever = HybridRetriever(db)
+        self._retriever = retriever
         self._llm = llm or get_llm_provider()
 
     def run(
@@ -188,7 +210,11 @@ class AnswerEvaluationPipeline:
             raise LLMEvaluationFailed("No answers to evaluate.")
 
         prompt_items: list[dict[str, Any]] = []
+        blank_results: list[QuestionEvaluation] = []
         for qa in qa_list:
+            if _is_blank_answer(qa.answer):
+                blank_results.append(_fallback_question_evaluation(qa))
+                continue
             contexts = self._retriever.retrieve_evaluation_context(
                 session_id=session_id,
                 question=qa.question,
@@ -206,42 +232,60 @@ class AnswerEvaluationPipeline:
                 }
             )
 
-        prompt = _build_batch_evaluation_prompt(
-            company=company,
-            job_role=job_role,
-            difficulty=difficulty,
-            items=prompt_items,
-        )
-
-        try:
-            raw = self._llm.generate_json(
-                prompt,
-                system=BATCH_EVALUATION_SYSTEM_PROMPT,
-                temperature=0.2,
+        raw = None
+        analysis: dict[str, Any]
+        llm_results: list[QuestionEvaluation]
+        if prompt_items:
+            prompt = _build_batch_evaluation_prompt(
+                company=company,
+                job_role=job_role,
+                difficulty=difficulty,
+                items=prompt_items,
             )
-        except Exception:  # noqa: BLE001
-            logger.exception("batch evaluation LLM failed; using fallback evaluation")
-            raw = None
+            try:
+                raw = self._llm.generate_json(
+                    prompt,
+                    system=BATCH_EVALUATION_SYSTEM_PROMPT,
+                    temperature=0.2,
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception("batch evaluation LLM failed; using fallback evaluation")
+                raw = None
 
-        if isinstance(raw, dict) and isinstance(raw.get("qa_results"), list):
-            by_order = {
-                int(item.get("order")): item
-                for item in raw["qa_results"]
-                if isinstance(item, dict) and item.get("order") is not None
-            }
-            per_question = [
-                self._question_result_from_raw(qa, by_order.get(qa.order, {}))
-                for qa in qa_list
-            ]
-            analysis = raw.get("analysis", {}) if isinstance(raw.get("analysis"), dict) else {}
+            non_blank_qas = [qa for qa in qa_list if not _is_blank_answer(qa.answer)]
+            if isinstance(raw, dict) and isinstance(raw.get("qa_results"), list):
+                by_order = {
+                    int(item.get("order")): item
+                    for item in raw["qa_results"]
+                    if isinstance(item, dict) and item.get("order") is not None
+                }
+                llm_results = [
+                    self._question_result_from_raw(qa, by_order.get(qa.order, {}))
+                    for qa in non_blank_qas
+                ]
+                analysis = raw.get("analysis", {}) if isinstance(raw.get("analysis"), dict) else {}
+            else:
+                llm_results = [_fallback_question_evaluation(qa) for qa in non_blank_qas]
+                analysis = {
+                    "summary": "Evaluation completed with fallback scoring.",
+                    "strengths": ["Answers were saved successfully."],
+                    "weaknesses": ["Detailed LLM analysis was not available."],
+                    "recommendation": "Retry after checking the LLM server logs.",
+                }
         else:
-            per_question = [_fallback_question_evaluation(qa) for qa in qa_list]
+            llm_results = []
             analysis = {
-                "summary": "Evaluation completed with fallback scoring.",
-                "strengths": ["Answers were saved successfully."],
-                "weaknesses": ["Detailed LLM analysis was not available."],
-                "recommendation": "Retry after checking the LLM server logs.",
+                "summary": "제출된 답변이 없어 평가를 진행하지 못했습니다.",
+                "strengths": [],
+                "weaknesses": ["모든 질문이 무응답 상태입니다."],
+                "recommendation": "다음 시도에서는 각 질문에 짧게라도 핵심 경험과 이유를 포함해 답변해보세요.",
             }
+
+        result_by_order = {result.order: result for result in [*blank_results, *llm_results]}
+        per_question = [
+            result_by_order.get(qa.order) or _fallback_question_evaluation(qa)
+            for qa in qa_list
+        ]
 
         total = int(round(sum(r.score for r in per_question) / len(per_question)))
         return SessionEvaluation(

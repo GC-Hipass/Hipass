@@ -69,7 +69,17 @@ def store_answer(
     audio_path = storage.put(key, audio_bytes, content_type=content_type or "audio/mpeg")
 
     stt = get_stt_provider()
-    answer_text = stt.transcribe(audio_bytes, content_type=content_type or "audio/mpeg")
+    answer_text = ""
+    if recording_duration_seconds > 0 and audio_bytes:
+        answer_text = stt.transcribe(audio_bytes, content_type=content_type or "audio/mpeg").strip()
+    if not answer_text:
+        logger.info(
+            "empty answer accepted without STT error: session=%s question=%s duration=%s bytes=%s",
+            session_id,
+            question_id,
+            recording_duration_seconds,
+            len(audio_bytes),
+        )
 
     answer = InterviewAnswer(
         session_id=session_id,
