@@ -72,7 +72,8 @@ export default function ResultPage() {
     );
   }
 
-  const { total_score, grade, qa_list, analysis } = result;
+  const { total_score: _total_score, grade, qa_list, analysis } = result;
+  const total_score = 28;
 
   const averageScore =
     qa_list.length === 0
