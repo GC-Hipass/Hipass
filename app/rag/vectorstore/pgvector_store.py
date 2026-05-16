@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import or_, select
+from sqlalchemy import insert, or_, select
 from sqlalchemy.orm import Session
 
 from app.db.models import DocumentChunk, KnowledgeChunk
@@ -39,18 +39,21 @@ class PgVectorStore:
     ) -> None:
         if len(contents) != len(embeddings):
             raise ValueError("contents and embeddings length mismatch")
-        for idx, (content, vec) in enumerate(zip(contents, embeddings, strict=True)):
-            self._db.add(
-                DocumentChunk(
-                    document_id=document_id,
-                    session_id=session_id,
-                    chunk_index=idx,
-                    content=content,
-                    embedding=vec,
-                    chunk_metadata=metadata or {},
-                )
-            )
-        self._db.flush()
+        rows = [
+            {
+                "document_id": document_id,
+                "session_id": session_id,
+                "chunk_index": idx,
+                "content": content,
+                "embedding": vec,
+                "chunk_metadata": metadata or {},
+            }
+            for idx, (content, vec) in enumerate(zip(contents, embeddings, strict=True))
+        ]
+        self._db.execute(
+            insert(DocumentChunk).execution_options(render_nulls=True),
+            rows,
+        )
 
     def insert_knowledge_chunks(
         self,
@@ -66,21 +69,24 @@ class PgVectorStore:
     ) -> None:
         if len(contents) != len(embeddings):
             raise ValueError("contents and embeddings length mismatch")
-        for idx, (content, vec) in enumerate(zip(contents, embeddings, strict=True)):
-            self._db.add(
-                KnowledgeChunk(
-                    knowledge_document_id=knowledge_document_id,
-                    source_type=source_type,
-                    company=company,
-                    job_role=job_role,
-                    difficulty=difficulty,
-                    chunk_index=idx,
-                    content=content,
-                    embedding=vec,
-                    chunk_metadata=metadata or {},
-                )
-            )
-        self._db.flush()
+        rows = [
+            {
+                "knowledge_document_id": knowledge_document_id,
+                "source_type": source_type,
+                "company": company,
+                "job_role": job_role,
+                "difficulty": difficulty,
+                "chunk_index": idx,
+                "content": content,
+                "embedding": vec,
+                "chunk_metadata": metadata or {},
+            }
+            for idx, (content, vec) in enumerate(zip(contents, embeddings, strict=True))
+        ]
+        self._db.execute(
+            insert(KnowledgeChunk).execution_options(render_nulls=True),
+            rows,
+        )
 
     def search_uploaded(
         self,
