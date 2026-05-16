@@ -75,14 +75,14 @@ class _FakeRetriever:
 
 
 class QuestionGenerationPipelineTests(unittest.TestCase):
-    def test_company_question_is_replaced_with_safe_template(self) -> None:
+    def test_questions_are_rewritten_into_safe_templates(self) -> None:
         llm = _SequenceLLM(
             [
                 [
                     {"order": 1, "question_type": "personality", "question": "협업 중 갈등을 해결한 경험을 말씀해주세요."},
                     {"order": 2, "question_type": "technical", "question": "FastAPI에서 비동기 처리를 어떻게 이해하고 계신지 설명해주세요."},
-                    {"order": 3, "question_type": "document", "question": "문서에 나온 FastAPI 프로젝트에서 맡은 역할을 설명해주세요."},
-                    {"order": 4, "question_type": "document", "question": "Docker 배포 과정에서 겪은 문제와 해결 방법을 말씀해주세요."},
+                    {"order": 3, "question_type": "document", "question": "나는 FastAPI 프로젝트에서 맡은 역할을 설명해주세요."},
+                    {"order": 4, "question_type": "document", "question": "Docker 배포 과정에서 겪은 문제와 해결 방법을 말씀해주세요.\n줄바꿈 포함"},
                     {"order": 5, "question_type": "company", "question": "나는 Naver에서 학습한 AI 기술과 관련된 문제를 해결하는 데 도움이 될 수 있습니다. 예를 들어, CLOVA, Naver Cloud Academy 등에 대해 설명해주세요."},
                 ]
             ]
@@ -96,22 +96,30 @@ class QuestionGenerationPipelineTests(unittest.TestCase):
             job_role="ai",
         )
 
+        self.assertEqual(llm.calls, 1)
+
+        personality_question = next(q.question for q in questions if q.question_type == "personality")
+        technical_question = next(q.question for q in questions if q.question_type == "technical")
+        document_questions = [q.question for q in questions if q.question_type == "document"]
         company_question = next(q.question for q in questions if q.question_type == "company")
+
+        self.assertIn("협업", personality_question)
+        self.assertIn("FastAPI", technical_question)
+        self.assertTrue(all("FastAPI" in question or "Docker" in question for question in document_questions))
         self.assertIn("NAVER", company_question)
         self.assertIn("자율과 책임", company_question)
         self.assertNotIn("CLOVA", company_question)
         self.assertNotIn("Naver Cloud Academy", company_question)
-        self.assertNotIn("나는", company_question)
+        for question in questions:
+            self.assertNotIn("나는", question.question)
+            self.assertNotIn("\n", question.question)
 
-    def test_invalid_first_person_question_triggers_retry(self) -> None:
+    def test_invalid_question_shape_triggers_retry(self) -> None:
         llm = _SequenceLLM(
             [
                 [
                     {"order": 1, "question_type": "personality", "question": "협업 중 갈등을 해결한 경험을 말씀해주세요."},
                     {"order": 2, "question_type": "technical", "question": "REST API 설계 원칙을 설명해주세요."},
-                    {"order": 3, "question_type": "document", "question": "나는 FastAPI 프로젝트에서 맡은 역할을 설명해주세요."},
-                    {"order": 4, "question_type": "document", "question": "Docker 배포 과정에서 겪은 문제와 해결 방법을 말씀해주세요."},
-                    {"order": 5, "question_type": "company", "question": "NAVER의 인재상 중 본인과 가장 잘 맞는 요소를 말씀해주세요."},
                 ],
                 [
                     {"order": 1, "question_type": "personality", "question": "협업 중 갈등을 해결한 경험을 말씀해주세요."},
