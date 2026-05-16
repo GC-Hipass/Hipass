@@ -26,6 +26,12 @@ class PgVectorStore:
     def __init__(self, db: Session):
         self._db = db
 
+    def _insert_rows_one_by_one(self, model: type[DocumentChunk] | type[KnowledgeChunk], rows: list[dict[str, Any]]) -> None:
+        for row in rows:
+            self._db.execute(
+                insert(model).execution_options(render_nulls=True).values(**row)
+            )
+
     # ------------- 업로드 문서 -------------
 
     def insert_document_chunks(
@@ -50,10 +56,7 @@ class PgVectorStore:
             }
             for idx, (content, vec) in enumerate(zip(contents, embeddings, strict=True))
         ]
-        self._db.execute(
-            insert(DocumentChunk).execution_options(render_nulls=True),
-            rows,
-        )
+        self._insert_rows_one_by_one(DocumentChunk, rows)
 
     def insert_knowledge_chunks(
         self,
@@ -83,10 +86,7 @@ class PgVectorStore:
             }
             for idx, (content, vec) in enumerate(zip(contents, embeddings, strict=True))
         ]
-        self._db.execute(
-            insert(KnowledgeChunk).execution_options(render_nulls=True),
-            rows,
-        )
+        self._insert_rows_one_by_one(KnowledgeChunk, rows)
 
     def search_uploaded(
         self,

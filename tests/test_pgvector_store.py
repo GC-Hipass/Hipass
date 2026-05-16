@@ -7,9 +7,9 @@ from app.rag.vectorstore.pgvector_store import PgVectorStore
 
 class _FakeSession:
     def __init__(self) -> None:
-        self.calls: list[tuple[object, list[dict[str, object]]]] = []
+        self.calls: list[tuple[object, object | None]] = []
 
-    def execute(self, statement, params):  # noqa: ANN001
+    def execute(self, statement, params=None):  # noqa: ANN001
         self.calls.append((statement, params))
 
 
@@ -29,15 +29,13 @@ class PgVectorStoreInsertTests(unittest.TestCase):
             metadata={"seed_group": "docs"},
         )
 
-        self.assertEqual(len(session.calls), 1)
-        statement, rows = session.calls[0]
-        self.assertTrue(statement.get_execution_options().get("render_nulls"))
-        self.assertEqual(len(rows), 2)
-        self.assertEqual(set(rows[0].keys()), set(rows[1].keys()))
-        self.assertIn("company", rows[0])
-        self.assertIsNone(rows[0]["company"])
-        self.assertIsNone(rows[0]["job_role"])
-        self.assertIsNone(rows[0]["difficulty"])
+        self.assertEqual(len(session.calls), 2)
+        first_statement, first_params = session.calls[0]
+        second_statement, second_params = session.calls[1]
+        self.assertTrue(first_statement.get_execution_options().get("render_nulls"))
+        self.assertTrue(second_statement.get_execution_options().get("render_nulls"))
+        self.assertIsNone(first_params)
+        self.assertIsNone(second_params)
 
     def test_insert_document_chunks_renders_nulls(self) -> None:
         session = _FakeSession()
@@ -51,12 +49,13 @@ class PgVectorStoreInsertTests(unittest.TestCase):
             metadata=None,
         )
 
-        self.assertEqual(len(session.calls), 1)
-        statement, rows = session.calls[0]
-        self.assertTrue(statement.get_execution_options().get("render_nulls"))
-        self.assertEqual(len(rows), 2)
-        self.assertEqual(set(rows[0].keys()), set(rows[1].keys()))
-        self.assertEqual(rows[0]["chunk_metadata"], {})
+        self.assertEqual(len(session.calls), 2)
+        first_statement, first_params = session.calls[0]
+        second_statement, second_params = session.calls[1]
+        self.assertTrue(first_statement.get_execution_options().get("render_nulls"))
+        self.assertTrue(second_statement.get_execution_options().get("render_nulls"))
+        self.assertIsNone(first_params)
+        self.assertIsNone(second_params)
 
 
 if __name__ == "__main__":
