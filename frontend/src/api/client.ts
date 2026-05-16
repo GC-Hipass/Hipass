@@ -25,11 +25,20 @@ async function parseError(res: Response): Promise<never> {
   throw new ApiClientError(res.status, body);
 }
 
+const REQUEST_TIMEOUT_MS = 600_000; // 10분
+
 async function request(path: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    return await fetch(`${BASE_URL}${path}`, init);
-  } catch {
+    return await fetch(`${BASE_URL}${path}`, { ...init, signal: controller.signal });
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") {
+      throw new Error("요청 시간이 초과되었습니다. 서버 상태를 확인해주세요.");
+    }
     throw new Error("백엔드 서버에 연결할 수 없습니다. 서버 실행 상태와 API 주소를 확인해주세요.");
+  } finally {
+    clearTimeout(timer);
   }
 }
 
