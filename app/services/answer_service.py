@@ -70,7 +70,7 @@ def store_answer(
 
     stt = get_stt_provider()
     answer_text = ""
-    if recording_duration_seconds > 0 and audio_bytes:
+    if audio_bytes:
         answer_text = stt.transcribe(audio_bytes, content_type=content_type or "audio/mpeg").strip()
     if not answer_text:
         logger.info(
